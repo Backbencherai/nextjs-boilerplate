@@ -9,7 +9,7 @@ export default function AnatomyPage() {
     <>
       <PageHeader
         title="Anatomy lab"
-        intro="Rotate, zoom and select structures of a schematic human body, toggle body systems, and read plain-language explanations."
+        intro="Rotate, zoom and select structures of a 3D human anatomy atlas, toggle body systems, and search structures by name."
       />
       <Container>
         <AnatomyLabLoader />

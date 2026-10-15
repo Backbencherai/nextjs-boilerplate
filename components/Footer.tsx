@@ -28,6 +28,7 @@ const cols = [
     links: [
       ["/safety", "Safety & limitations"],
       ["/privacy", "Privacy policy"],
+      ["/credits", "Credits & licences"],
     ],
   },
 ] as const;
