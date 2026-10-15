@@ -6,6 +6,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { HeartPulse, Menu, X, Languages } from "lucide-react";
 import { useT } from "./LanguageProvider";
+import { AuthButton } from "./AuthButton";
 import { LANGS, type Lang } from "@/lib/i18n/dictionaries";
 
 const NAV = [
@@ -49,6 +50,7 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <AuthButton />
           <label className="flex items-center gap-1 text-sm">
             <Languages className="h-4 w-4 text-muted" aria-hidden />
             <span className="sr-only">{t("nav.language")}</span>

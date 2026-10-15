@@ -13,6 +13,10 @@ export default function PrivacyPage() {
           Personal Data Protection Act, 2023 and applicable health-data rules before launch.
         </Notice>
         <section>
+          <h2 className="text-xl font-semibold">If accounts are enabled</h2>
+          <p className="mt-2">Creating an account stores your email address and a password hash with our authentication provider (Supabase), plus the reminders and notes you choose to save. Only you can read them; staff roles cannot read your personal notes. Deleting data on the dashboard removes your reminders and notes; full account deletion is not yet self-service. If accounts are not enabled, none of this applies.</p>
+        </section>
+        <section>
           <h2 className="text-xl font-semibold">What stays on your device</h2>
           <p className="mt-2">Dashboard reminders, notes, saved items and your language choice are stored in your browser&apos;s local storage. They are not sent to any server. Use the dashboard&apos;s delete button to erase them.</p>
         </section>
