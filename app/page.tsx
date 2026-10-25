@@ -5,7 +5,7 @@ import { AGENTS } from "@/lib/agents";
 
 export default function Home() {
   return (
-    <main className="mx-auto max-w-6xl px-6">
+    <main className="mx-auto max-w-6xl px-6 [background:radial-gradient(60%_40%_at_50%_0%,rgba(124,92,255,.18),transparent)]">
       <nav className="flex items-center justify-between py-6">
         <Logo />
         <div className="flex items-center gap-3 text-sm">
@@ -36,6 +36,12 @@ export default function Home() {
         ))}
       </section>
 
+      <section className="grid gap-4 py-24 md:grid-cols-3">
+        {[["1. Create a company","Name it and set a goal. Orvia gives every company its own agents, tasks and revenue log."],["2. Assign work","Atlas plans, Forge proposes code, Pulse drafts marketing, Harbor handles support."],["3. Approve & ship","Anything that touches the outside world waits for your explicit approval."]].map(([t,d])=>(
+          <div key={t} className="panel p-6"><h3 className="font-semibold">{t}</h3><p className="mt-2 text-sm text-[var(--muted)]">{d}</p></div>
+        ))}
+      </section>
+
       <section id="pricing" className="py-24">
         <h2 className="text-center text-3xl font-bold">Simple pricing in ₹</h2>
         <div className="mt-10 grid gap-5 md:grid-cols-3">
@@ -53,6 +59,7 @@ export default function Home() {
         </div>
         <p className="mt-4 text-center text-xs text-[var(--muted)]">Prices exclude 18% GST.</p>
       </section>
+      <footer className="border-t border-[var(--line)] py-8 text-center text-xs text-[var(--muted)]">© Orvia · Made in India 🇮🇳</footer>
     </main>
   );
 }
