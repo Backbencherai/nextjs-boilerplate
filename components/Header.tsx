@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { HeartPulse, Menu, X, Languages } from "lucide-react";
+import { Menu, X, Languages } from "lucide-react";
+import { LogoMark } from "./Logo";
 import { useT } from "./LanguageProvider";
 import { AuthButton } from "./AuthButton";
 import { LANGS, type Lang } from "@/lib/i18n/dictionaries";
@@ -27,11 +28,11 @@ export function Header() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-white/95 backdrop-blur">
+    <header className="on-dark sticky top-0 z-40 border-b border-white/10 bg-charcoal/90 text-white backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2 font-semibold" aria-label="Swasth Setu home">
-          <HeartPulse className="h-6 w-6 text-accent" aria-hidden />
-          <span className="text-lg tracking-tight">Swasth Setu</span>
+          <LogoMark className="h-8 w-8" />
+          <span className="display text-xl tracking-tight">Swasth Setu</span>
         </Link>
 
         <nav className="hidden items-center gap-1 xl:flex" aria-label="Primary">
@@ -40,8 +41,8 @@ export function Header() {
               key={n.href}
               href={n.href}
               aria-current={pathname.startsWith(n.href) ? "page" : undefined}
-              className={`rounded-lg px-3 py-2 text-sm font-medium hover:bg-surface ${
-                pathname.startsWith(n.href) ? "text-accent" : "text-foreground"
+              className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-white/10 ${
+                pathname.startsWith(n.href) ? "text-accent-bright" : "text-white/80"
               }`}
             >
               {t(n.key)}
@@ -52,12 +53,12 @@ export function Header() {
         <div className="flex items-center gap-2">
           <AuthButton />
           <label className="flex items-center gap-1 text-sm">
-            <Languages className="h-4 w-4 text-muted" aria-hidden />
+            <Languages className="h-4 w-4 text-white/60" aria-hidden />
             <span className="sr-only">{t("nav.language")}</span>
             <select
               value={lang}
               onChange={(e) => setLang(e.target.value as Lang)}
-              className="min-h-[40px] rounded-lg border border-line bg-white px-2 text-sm"
+              className="min-h-[40px] rounded-lg border border-white/15 bg-charcoal-2 px-2 text-sm text-white"
             >
               {LANGS.map((l) => (
                 <option key={l.code} value={l.code}>
@@ -68,7 +69,7 @@ export function Header() {
           </label>
           <button
             type="button"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-line xl:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-white/15 xl:hidden"
             aria-expanded={open}
             aria-controls="mobile-nav"
             aria-label={t("nav.menu")}
@@ -84,7 +85,7 @@ export function Header() {
           <motion.nav
             id="mobile-nav"
             aria-label="Mobile"
-            className="border-t border-line bg-white xl:hidden"
+            className="border-t border-white/10 bg-charcoal xl:hidden"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
@@ -96,7 +97,7 @@ export function Header() {
                   <Link
                     href={n.href}
                     onClick={() => setOpen(false)}
-                    className="flex min-h-[44px] items-center rounded-lg px-3 text-sm font-medium hover:bg-surface"
+                    className="flex min-h-[44px] items-center rounded-lg px-3 text-sm font-medium text-white/90 hover:bg-white/10"
                   >
                     {t(n.key)}
                   </Link>

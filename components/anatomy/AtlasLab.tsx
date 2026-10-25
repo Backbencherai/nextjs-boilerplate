@@ -62,9 +62,9 @@ function Atlas({ manifest, compact }: { manifest: Manifest; compact: boolean }) 
   const pending = [...load].filter((s) => !loaded.has(s));
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+    <div className={compact ? "" : "grid gap-4 lg:grid-cols-[1fr_360px]"}>
       <div>
-        <div className={`relative overflow-hidden rounded-2xl border border-line ${compact ? "h-[360px]" : "h-[55vh] min-h-[340px] lg:h-[680px]"}`}>
+        <div className={`relative overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(ellipse_at_50%_30%,#21423e_0%,#0f1e1d_55%,#091110_100%)] shadow-[0_30px_70px_-30px_rgba(0,0,0,0.7)] ${compact ? "h-[420px] sm:h-[520px]" : "h-[62vh] min-h-[380px] lg:h-[720px]"}`}>
           <AtlasScene
             ref={scene}
             manifest={manifest}
@@ -74,23 +74,24 @@ function Atlas({ manifest, compact }: { manifest: Manifest; compact: boolean }) 
             selected={selected}
             onSelect={pick}
             xray={xray}
+            autoRotate={compact}
             onLoaded={onLoaded}
           />
           {pending.length > 0 && (
-            <p className="absolute right-3 top-3 rounded bg-white/90 px-2 py-1 text-xs text-muted" role="status">Loading {pending.join(", ")}…</p>
+            <p className="absolute right-3 top-3 rounded-full bg-white/10 px-3 py-1 text-xs text-white/80 backdrop-blur" role="status">Loading {pending.join(", ")}…</p>
           )}
-          <p className="pointer-events-none absolute bottom-2 left-3 rounded bg-white/85 px-2 py-1 text-[11px] text-muted">
-            Drag to rotate · scroll/pinch to zoom · right-drag/two fingers to pan · click to select
+          <p className="pointer-events-none absolute bottom-3 left-3 right-3 text-[11px] text-white/55 sm:right-auto">
+            Drag to rotate · scroll or pinch to zoom · right-drag or two fingers to pan · tap a structure to select
           </p>
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2" role="toolbar" aria-label="Viewer controls">
-          <button className="btn btn-secondary" onClick={() => scene.current?.reset()}><RotateCcw className="h-4 w-4" aria-hidden /> Reset camera</button>
-          <button className="btn btn-secondary" aria-pressed={xray} onClick={() => setXray((v) => !v)}><Eye className="h-4 w-4" aria-hidden /> {xray ? "X-ray view" : "Solid view"}</button>
-          <button className="btn btn-secondary" disabled={!selected} onClick={() => setSelected(null)}>Clear selection</button>
+          <button className={"btn btn-ghost-dark"} onClick={() => scene.current?.reset()}><RotateCcw className="h-4 w-4" aria-hidden /> Reset camera</button>
+          <button className={"btn btn-ghost-dark"} aria-pressed={xray} onClick={() => setXray((v) => !v)}><Eye className="h-4 w-4" aria-hidden /> {xray ? "X-ray view" : "Solid view"}</button>
+          <button className={"btn btn-ghost-dark"} disabled={!selected} onClick={() => setSelected(null)}>Clear selection</button>
         </div>
 
-        <p className="mt-3 text-xs text-muted">
+        <p className="mt-3 text-xs text-white/55">
           Model: <a className="underline" href="https://github.com/Z-Anatomy/Models-of-human-anatomy" target="_blank" rel="noopener noreferrer">Z-Anatomy</a> — CC BY-SA 4.0, derived from BodyParts3D (CC BY-SA 2.1 Japan).
           Modified: mesh simplified and compressed; some parts omitted. Shared under the same licence — see <a className="underline" href="/credits">credits</a>.
         </p>
@@ -108,9 +109,10 @@ function Atlas({ manifest, compact }: { manifest: Manifest; compact: boolean }) 
         )}
       </div>
 
+      {!compact && (
       <aside className="space-y-4" aria-label="Structure explorer">
-        <fieldset className="card">
-          <legend className="flex items-center gap-2 px-1 text-sm font-semibold"><Layers className="h-4 w-4" aria-hidden /> Layers</legend>
+        <div role="group" aria-labelledby="layers-h" className="card">
+          <h2 id="layers-h" className="flex items-center gap-2 text-sm font-semibold"><Layers className="h-4 w-4" aria-hidden /> Layers</h2>
           <div className="mt-2 space-y-1">
             {LAYERS.map((l) => (
               <div key={l.id}>
@@ -124,7 +126,7 @@ function Atlas({ manifest, compact }: { manifest: Manifest; compact: boolean }) 
               </div>
             ))}
           </div>
-        </fieldset>
+        </div>
 
         {selected ? (
           <section className="card" aria-live="polite">
@@ -174,6 +176,7 @@ function Atlas({ manifest, compact }: { manifest: Manifest; compact: boolean }) 
           </div>
         </div>
       </aside>
+      )}
     </div>
   );
 }

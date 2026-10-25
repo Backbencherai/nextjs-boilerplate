@@ -22,6 +22,13 @@ export default function CreditsPage() {
             download them from <code>/models/anatomy/</code>. See <a className="underline" href="/models/anatomy/LICENSE.md">LICENSE.md</a> there for the full change list.
           </p>
         </section>
+        <section>
+          <h2 className="text-xl font-semibold">Images, lighting and fonts</h2>
+          <p className="mt-2">
+            The anatomy pictures on the home page were rendered from the adapted Z-Anatomy model and are shared under the same CC BY-SA 4.0 licence.
+            Studio lighting in the 3D viewer uses a CC0 HDR from the <code>@pmndrs/assets</code> bundle. Typefaces (Inter, Fraunces, Noto Sans Devanagari and Kannada) are open-source under the SIL Open Font License.
+          </p>
+        </section>
         <Notice tone="warn" title="Omitted for licence reasons">
           Kidneys and inner-ear structures (upstream sources are non-commercial), and cortical-surface and white-matter
           meshes (reuse terms unverified) are not included.

@@ -8,6 +8,9 @@
 | Neo-cortex / white-matter meshes (in Z-Anatomy) | "Brainder" / University of Washington | Not verified | **No — excluded** | Re-include only after confirming terms. |
 | Cranial-nerve content (in Z-Anatomy) | University of Dundee CAHID | CC BY 4.0 | Yes | Attribution given. |
 | Z-Anatomy text definitions | Wikipedia-derived | CC BY-SA 3.0 | **No** | Not imported; needs review + attribution handling first. |
+| Marketing renders `public/images/atlas/*.jpg` | Rendered by `scripts/render/render_atlas_images.py` from the licence-filtered Z-Anatomy export | **CC BY-SA 4.0** (derivative of Z-Anatomy / BodyParts3D) | **Yes** | Attribute on /credits; keep share-alike. |
+| Studio HDR `public/hdri/studio.exr` | `@pmndrs/assets` 1.7.0 (CC0-1.0 bundle) | CC0 | Yes | Licence copy in `public/hdri/`. |
+| Fonts (Inter, Fraunces, Noto Sans Devanagari/Kannada) | `@fontsource*` npm packages | SIL OFL 1.1 | Yes | Bundled by Next, no CDN. |
 | Schematic fallback shapes (`lib/anatomy/structures.ts`) | Authored in this repo | Project code | Yes (fallback only) | Used if WebGL / atlas loading fails. |
 | nqwrc/3d-anatomy | https://nqwrc.github.io/3d-anatomy/ | Not checked | No | Reference only. |
 | Red Cross text and images | redcross.org / redcross.org.uk | Not checked; assume all rights reserved | No | Link only. |

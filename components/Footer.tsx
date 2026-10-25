@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { HeartPulse } from "lucide-react";
+import { LogoMark } from "./Logo";
 
 const cols = [
   {
@@ -35,11 +35,11 @@ const cols = [
 
 export function Footer() {
   return (
-    <footer className="mt-24 bg-charcoal text-white">
+    <footer className="on-dark mt-24 bg-charcoal text-white">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-4">
         <div>
           <div className="flex items-center gap-2 font-semibold">
-            <HeartPulse className="h-6 w-6 text-emerald-400" aria-hidden /> Swasth Setu
+            <LogoMark className="h-8 w-8" /> <span className="display text-xl">Swasth Setu</span>
           </div>
           <p className="mt-3 text-sm text-white/70">
             Health education and care navigation. Not a medical service.

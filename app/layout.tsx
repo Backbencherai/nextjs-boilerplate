@@ -1,4 +1,10 @@
 import type { Metadata, Viewport } from "next";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/fraunces";
+import "@fontsource/noto-sans-devanagari/400.css";
+import "@fontsource/noto-sans-devanagari/600.css";
+import "@fontsource/noto-sans-kannada/400.css";
+import "@fontsource/noto-sans-kannada/600.css";
 import "./globals.css";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { Header } from "@/components/Header";
@@ -12,7 +18,7 @@ export const metadata: Metadata = {
   applicationName: "Swasth Setu",
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0f766e" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0b1514" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

@@ -29,7 +29,7 @@ export function AuthButton() {
 
   if (state === "off" || state === "loading") return null;
   return (
-    <Link href="/auth" className="inline-flex min-h-[40px] items-center gap-1 rounded-lg border border-line px-3 text-sm font-medium hover:border-accent">
+    <Link href="/auth" className="inline-flex min-h-[40px] items-center gap-1 rounded-lg border border-white/15 px-3 text-sm font-medium text-white hover:border-accent-bright">
       <UserRound className="h-4 w-4" aria-hidden /> {state === "in" ? "Account" : "Sign in"}
     </Link>
   );

@@ -1,19 +1,14 @@
-import { FlaskConical, Info } from "lucide-react";
+import { FlaskConical, Info, ShieldAlert, TriangleAlert } from "lucide-react";
 
-export function PageHeader({
-  title,
-  intro,
-  children,
-}: {
-  title: string;
-  intro: string;
-  children?: React.ReactNode;
-}) {
+export function PageHeader({ title, intro, eyebrow, children }: { title: string; intro: string; eyebrow?: string; children?: React.ReactNode }) {
   return (
-    <section className="border-b border-line bg-surface">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
-        <p className="mt-3 max-w-3xl text-lg text-muted">{intro}</p>
+    <section className="relative overflow-hidden border-b border-line bg-surface">
+      <div className="grid-pattern-light pointer-events-none absolute inset-0" aria-hidden />
+      <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-accent/10 blur-3xl" aria-hidden />
+      <div className="relative mx-auto max-w-7xl px-4 py-14 sm:px-6">
+        {eyebrow && <p className="eyebrow mb-3">{eyebrow}</p>}
+        <h1 className="max-w-3xl text-4xl font-semibold leading-[1.1] sm:text-5xl">{title}</h1>
+        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted">{intro}</p>
         {children}
       </div>
     </section>
@@ -21,7 +16,7 @@ export function PageHeader({
 }
 
 export function Container({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`mx-auto max-w-7xl px-4 py-10 sm:px-6 ${className}`}>{children}</div>;
+  return <div className={`mx-auto max-w-7xl px-4 py-12 sm:px-6 ${className}`}>{children}</div>;
 }
 
 export function DemoBadge({ children = "Demo data" }: { children?: React.ReactNode }) {
@@ -32,25 +27,20 @@ export function DemoBadge({ children = "Demo data" }: { children?: React.ReactNo
   );
 }
 
-export function Notice({
-  title,
-  children,
-  tone = "info",
-}: {
-  title: string;
-  children: React.ReactNode;
-  tone?: "info" | "warn" | "danger";
-}) {
+export function StatusPill({ kind, children }: { kind: "live" | "partial" | "pending"; children: React.ReactNode }) {
+  return <span className={`status-pill status-${kind}`}><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />{children}</span>;
+}
+
+export function Notice({ title, children, tone = "info" }: { title: string; children: React.ReactNode; tone?: "info" | "warn" | "danger" }) {
   const tones = {
-    info: "border-blue/30 bg-blue-50/60",
-    warn: "border-amber-300 bg-amber-50",
-    danger: "border-red-300 bg-red-50",
+    info: { box: "border-[#c9dcec] bg-[#f1f6fb]", icon: "text-blue", Icon: Info },
+    warn: { box: "border-amber-300 bg-amber-50", icon: "text-amber-700", Icon: TriangleAlert },
+    danger: { box: "border-red-300 bg-red-50", icon: "text-red-700", Icon: ShieldAlert },
   } as const;
+  const t = tones[tone];
   return (
-    <div role="note" className={`rounded-xl border p-4 ${tones[tone]}`}>
-      <p className="flex items-center gap-2 font-semibold">
-        <Info className="h-4 w-4" aria-hidden /> {title}
-      </p>
+    <div role="note" className={`rounded-2xl border p-4 ${t.box}`}>
+      <p className="flex items-center gap-2 font-semibold"><t.Icon className={`h-4 w-4 ${t.icon}`} aria-hidden /> {title}</p>
       <div className="mt-1 text-sm leading-relaxed">{children}</div>
     </div>
   );
