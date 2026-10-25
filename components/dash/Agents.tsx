@@ -12,7 +12,7 @@ export default function Agents({ company, runs, setRuns, repo }: { company: Comp
       const res = await fetch("/api/agent", { method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ agentId, task: `Company: ${company.name}. Goal: ${company.goal}.\nTask: ${task}`.slice(0, 2000), repo: repo || undefined }) });
       const data = await res.json(); if (!res.ok) throw new Error(data.error || "Failed");
-      setRuns((r) => [{ id: uid(), companyId: company.id, agentId, task, output: data.output, status: data.needsApproval ? "pending" : "done", at: new Date().toISOString() }, ...r].slice(0, 200));
+      setRuns((r) => [{ id: uid(), companyId: company.id, agentId, task, output: data.output, status: (data.needsApproval ? "pending" : "done") as Run["status"], at: new Date().toISOString() }, ...r].slice(0, 200));
       setTask("");
     } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
   }
