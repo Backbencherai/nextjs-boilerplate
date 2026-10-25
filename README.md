@@ -43,3 +43,7 @@ Safety: server-only key, input validation, rate limiting, security headers/CSP, 
 1. Push to GitHub, import the repo at vercel.com/new (free Hobby plan is fine).
 2. Add `ANTHROPIC_API_KEY` under Project → Settings → Environment Variables.
 3. Project → Settings → Domains → add your domain (buy one at Namecheap / GoDaddy / Cloudflare, ~₹800/yr for .com) and add the DNS records Vercel shows.
+
+## Master model & Court
+- **Master** (`/api/master`): routes a task to the best agent, runs it, flags high-stakes work.
+- **Court** (`/api/court`): prosecutor / defense / jury / judge trial. Trial flow and juror roster adapted from [court-skill](https://github.com/alexyc9381/court-skill) by Alex Chen, MIT — license kept in `licenses/`.

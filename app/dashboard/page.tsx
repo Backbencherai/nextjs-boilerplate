@@ -8,9 +8,11 @@ import Overview from "@/components/dash/Overview";
 import Agents from "@/components/dash/Agents";
 import Tasks from "@/components/dash/Tasks";
 import Billing from "@/components/dash/Billing";
+import Court from "@/components/dash/Court";
+import Master from "@/components/dash/Master";
 import Settings from "@/components/dash/Settings";
 
-const TABS = ["Overview", "Agents", "Tasks", "Billing", "Settings"] as const;
+const TABS = ["Overview", "Master", "Agents", "Court", "Tasks", "Billing", "Settings"] as const;
 
 export default function Dashboard() {
   const [companies, setCompanies] = useLocal<Company[]>("orvia.companies", []);
@@ -20,6 +22,7 @@ export default function Dashboard() {
   const [revenue, setRevenue] = useLocal<Revenue[]>("orvia.revenue", []);
   const [repo, setRepo] = useLocal<string>("orvia.repo", "");
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
+  const [trialText, setTrialText] = useState("");
   const [name, setName] = useState(""); const [goal, setGoal] = useState("");
 
   const company = companies.find((c) => c.id === activeId) ?? companies[0];
@@ -53,6 +56,8 @@ export default function Dashboard() {
       <main className="min-w-0 flex-1">
         <h1 className="mb-6 text-2xl font-bold">{company.name}<span className="ml-3 text-sm font-normal text-[var(--muted)]">{company.goal}</span></h1>
         {tab === "Overview" && <Overview companyId={company.id} runs={runs} tasks={tasks} revenue={revenue} setRevenue={setRevenue} />}
+        {tab === "Master" && <Master company={company} onTrial={(t) => { setTrialText(t); setTab("Court"); }} />}
+        {tab === "Court" && <Court key={trialText} prefill={trialText} />}
         {tab === "Agents" && <Agents company={company} runs={runs} setRuns={setRuns} repo={repo} />}
         {tab === "Tasks" && <Tasks companyId={company.id} tasks={tasks} setTasks={setTasks} />}
         {tab === "Billing" && <Billing />}
