@@ -1,26 +1,17 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+:root { --bg: #07080d; --panel: #0e1018; --line: #1d2030; --fg: #e8eaf2; --muted: #8b90a7; }
+body { background: var(--bg); color: var(--fg); font-family: ui-sans-serif, system-ui, sans-serif; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+.btn { background: linear-gradient(135deg,#7c5cff,#22d3ee); color: #07080d; font-weight: 600; border-radius: 10px; padding: .6rem 1.1rem; }
+.btn-ghost { border: 1px solid var(--line); border-radius: 10px; padding: .6rem 1.1rem; }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
+.logo-hex { stroke-dasharray: 170; stroke-dashoffset: 170; animation: draw 1.4s ease-out forwards; }
+.logo-o { stroke-dasharray: 80; stroke-dashoffset: 80; animation: draw 1.2s .5s ease-out forwards; }
+.logo-orbit { transform-origin: 32px 32px; opacity: 0; animation: fade .4s 1.4s forwards, spin 6s 1.4s linear infinite; }
+.logo-core { transform-origin: 32px 32px; animation: pulse 2.4s 1.4s ease-in-out infinite; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fade { to { opacity: 1; } }
+@keyframes pulse { 50% { transform: scale(1.6); opacity: .6; } }
+@media (prefers-reduced-motion: reduce) { .logo-hex,.logo-o,.logo-orbit,.logo-core { animation: none; stroke-dashoffset: 0; opacity: 1; } }
