@@ -12,6 +12,8 @@ export const profile = {
   email: "hello@dewanshi.com", // EDIT: real email
   linkedin:
     "https://www.linkedin.com/in/dewanshi-chawaldhal-23b3813b2",
+  // Put her photo in /public (e.g. /public/dewanshi.jpg) and set photo: "/dewanshi.jpg"
+  photo: "" as string,
   intro:
     "I design and build thoughtful digital experiences — where clear thinking, bold visuals and motion meet to tell a story.", // EDIT
   about:

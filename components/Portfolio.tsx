@@ -98,6 +98,25 @@ export default function Portfolio() {
   const root = useRef<HTMLDivElement>(null);
   const lenisRef = useRef<Lenis | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [nameOpen, setNameOpen] = useState(false);
+  const nameTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* logo click: the name slides out beside the "dc" mark, then tucks away again */
+  const toggleName = () => {
+    if (nameTimer.current) clearTimeout(nameTimer.current);
+    setNameOpen((open) => {
+      if (!open) nameTimer.current = setTimeout(() => setNameOpen(false), 3500);
+      return !open;
+    });
+    gsap.fromTo(
+      ".logo .mono-path",
+      { strokeDasharray: 1, strokeDashoffset: 1 },
+      { strokeDashoffset: 0, duration: 0.9, ease: "power2.inOut" }
+    );
+  };
+  useEffect(() => () => {
+    if (nameTimer.current) clearTimeout(nameTimer.current);
+  }, []);
 
   const scrollTo = (target: string | number) => {
     setMenuOpen(false);
@@ -394,17 +413,21 @@ export default function Portfolio() {
 
       {/* ===== nav ===== */}
       <header className="nav">
-        <a
-          href="#top"
-          className="logo"
-          onClick={(e) => {
-            e.preventDefault();
-            scrollTo(0);
-          }}
+        <button
+          className={`logo ${nameOpen ? "is-open" : ""}`}
+          onClick={toggleName}
+          aria-label={`${profile.firstName} ${profile.lastName}`}
+          aria-expanded={nameOpen}
         >
           <Monogram className="logo-mono" />
-          <span>{profile.firstName}</span>
-        </a>
+          <span className="logo-name" aria-hidden>
+            {profile.firstName.split("").map((c, i) => (
+              <span key={i} style={{ transitionDelay: `${(nameOpen ? i : profile.firstName.length - i) * 0.035}s` }}>
+                {c}
+              </span>
+            ))}
+          </span>
+        </button>
         <button
           className={`menu-btn ${menuOpen ? "is-open" : ""}`}
           onClick={() => setMenuOpen((o) => !o)}
@@ -464,7 +487,10 @@ export default function Portfolio() {
               <path pathLength={1} d="M440 60 C 260 60, 220 280, 330 320 C 440 360, 430 170, 300 200 C 170 230, 230 480, 420 560" />
             </svg>
 
-            <div className="hero-card hero-card--l">
+            <div
+              className={`hero-card hero-card--l ${profile.photo ? "has-photo" : ""}`}
+              style={profile.photo ? { backgroundImage: `url(${profile.photo})` } : undefined}
+            >
               <span className="hc-label">Hello, I&apos;m</span>
               <span className="hc-name">{profile.firstName}</span>
             </div>

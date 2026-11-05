@@ -58,12 +58,16 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   padding: 18px var(--gutter); pointer-events: none;
 }
 .nav > * { pointer-events: auto; }
-.logo { display: flex; align-items: center; gap: 4px; color: var(--orange); }
-.logo-mono { width: 52px; height: auto; }
-.logo span {
+.logo { display: flex; align-items: center; gap: 6px; color: var(--orange); -webkit-tap-highlight-color: transparent; }
+.logo-mono { width: clamp(52px, 6vw, 64px); height: auto; transition: transform .5s var(--ease); }
+.logo:hover .logo-mono { transform: rotate(-8deg) scale(1.06); }
+.logo-name {
+  display: inline-flex; overflow: hidden;
   font-family: var(--font-display), Impact, sans-serif; text-transform: uppercase;
-  font-size: clamp(30px, 4vw, 44px); line-height: 1; letter-spacing: 0.01em;
+  font-size: clamp(30px, 4vw, 44px); line-height: 1.05; letter-spacing: 0.01em;
 }
+.logo-name span { display: inline-block; transform: translateY(110%); transition: transform .55s var(--ease); }
+.logo.is-open .logo-name span { transform: none; }
 .menu-btn {
   width: 52px; height: 52px; border: 2px solid var(--orange); border-radius: 6px;
   background: rgba(251, 227, 227, 0.85); backdrop-filter: blur(6px); position: relative;
@@ -130,6 +134,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   display: flex; flex-direction: column; justify-content: space-between; padding: clamp(12px, 1.6vw, 22px);
   box-shadow: 8px 8px 0 var(--ink);
 }
+.hero-card.has-photo { background-size: cover; background-position: center; color: var(--cream); }
+.hero-card.has-photo::after { content: ""; position: absolute; inset: 0; border-radius: 8px; background: linear-gradient(transparent 45%, rgba(0,0,0,.55)); }
+.hero-card.has-photo > * { position: relative; z-index: 1; }
+.hero-card.has-photo .hc-name { color: var(--cream); }
 .hero-card--r { background: var(--orange); color: var(--cream); }
 .hc-label { font-size: clamp(11px, 1vw, 14px); font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
 .hc-name { font-family: var(--font-display), Impact, sans-serif; text-transform: uppercase; font-size: clamp(19px, 3.4vw, 60px); line-height: .9; }
@@ -251,4 +259,13 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 @media (prefers-reduced-motion: reduce) {
   .menu, .menu li { transition: none; }
+}
+
+/* small phones: keep the hero cards + badge inside the screen */
+@media (max-width: 520px) {
+  .hero-visual { gap: 3vw; height: clamp(360px, 105vw, 480px); }
+  .hero-card { width: 30vw; border-radius: 8px; box-shadow: 5px 5px 0 var(--ink); padding: 10px; }
+  .badge { width: 22vw; }
+  .hc-label { font-size: 9px; }
+  .hc-name { font-size: 4.6vw; }
 }
