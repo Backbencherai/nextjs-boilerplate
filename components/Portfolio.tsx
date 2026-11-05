@@ -21,6 +21,8 @@ import {
 } from "@/lib/content";
 
 gsap.registerPlugin(ScrollTrigger);
+/* stroke-drawing animates fractional values (0 → 1); GSAP's pixel rounding would make them jump */
+gsap.defaults({ autoRound: false });
 
 /* ═════════════════════════ small building blocks ═════════════════════════ */
 
@@ -36,7 +38,7 @@ function Letters({ text, className }: { text: string; className?: string }) {
   );
 }
 
-/** Hand-drawn "dc" monogram: the d and the c are separate strokes so they can draw in turn. */
+/** Hand-drawn "dc" monogram, written as a single continuous stroke so it can "write itself". */
 function Monogram({ className }: { className?: string }) {
   const common = {
     stroke: "currentColor",
@@ -47,8 +49,12 @@ function Monogram({ className }: { className?: string }) {
   };
   return (
     <svg className={className} viewBox="0 0 140 110" fill="none" aria-hidden>
-      <path className="mono-path mono-d" d="M62 14 V88 C62 96 70 98 74 90 M62 58 C58 44 26 42 22 66 C19 86 44 98 62 80" {...common} />
-      <path className="mono-path mono-c" d="M126 54 C114 40 86 44 86 66 C86 90 112 96 128 80" {...common} />
+      {/* one continuous pen stroke: bowl of the d → up and down the stem → into the c */}
+      <path
+        className="mono-path"
+        d="M60 60 C54 46 24 46 22 66 C20 88 50 96 60 80 L62 14 L62 84 C62 96 76 98 86 86 C90 76 88 54 102 48 C112 43 122 46 126 54 C122 46 112 43 102 48 C88 54 90 76 86 86 C84 96 116 100 128 80"
+        {...common}
+      />
     </svg>
   );
 }
@@ -150,7 +156,7 @@ export default function Portfolio() {
     gsap.fromTo(
       ".logo .mono-path",
       { strokeDasharray: 1, strokeDashoffset: 1 },
-      { strokeDashoffset: 0, duration: 0.6, stagger: 0.35, ease: "power2.inOut" }
+      { strokeDashoffset: 0, duration: 1.1, ease: "power1.inOut" }
     );
   };
   useEffect(
@@ -175,7 +181,6 @@ export default function Portfolio() {
     lenis.on("scroll", ScrollTrigger.update);
     const raf = (t: number) => lenis.raf(t * 1000);
     gsap.ticker.add(raf);
-    gsap.ticker.lagSmoothing(0);
     lenis.stop();
     if ("scrollRestoration" in history) history.scrollRestoration = "manual";
     window.scrollTo(0, 0);
@@ -221,25 +226,48 @@ export default function Portfolio() {
       gsap.set(".menu-btn", { scale: 0, rotate: -90 });
       let fly = { dx: 0, dy: 0, s: 1 };
 
+      /* while the intro plays, never skip frames after a hiccup (slow phones):
+         pause instead, so every frame of the drawing is seen */
+      gsap.ticker.lagSmoothing(250, 33);
       const intro = gsap.timeline({
+        paused: true,
         onComplete: () => {
+          gsap.ticker.lagSmoothing(0);
           lenis.start();
           document.documentElement.classList.remove("is-loading");
           ScrollTrigger.refresh();
         },
       });
       intro
-        .set(".preloader .mono-path", { strokeDasharray: 1, strokeDashoffset: 1 })
-        .to(".preloader .mono-d", { strokeDashoffset: 0, duration: 1.1 * d, ease: "power2.inOut" }, 0.2)
-        .to(".preloader .mono-c", { strokeDashoffset: 0, duration: 0.7 * d, ease: "power2.inOut" }, "-=0.25")
-        .fromTo(preMono, { scale: 0.9 }, { scale: 1, duration: 0.9 * d, ease: "elastic.out(1, 0.45)" }, "-=0.2")
-        .from(
+        .set(".preloader .mono-path, .pre-loops path", { strokeDasharray: 1, strokeDashoffset: 1 })
+        /* background loops sweep across while the mark draws */
+        .set(".pre-name", { visibility: "visible" })
+        .to(".pre-loops path", { strokeDashoffset: 0, duration: 2.2 * d, stagger: 0.25, ease: "power2.inOut" }, 0)
+        .fromTo(preMono, { scale: 0.6, rotate: -12 }, { scale: 1, rotate: 0, duration: 1.4 * d, ease: "elastic.out(1, 0.5)" }, 0.1)
+        .to(".preloader .mono-path", { strokeDashoffset: 0, duration: 1.6 * d, ease: "power1.inOut" }, 0.15)
+        /* full name bounces in from the centre */
+        .fromTo(
           ".pre-name .letter",
-          { yPercent: 110, rotate: 8, stagger: { each: 0.03, from: "center" }, duration: 0.9 * d, ease: "expo.out" },
-          "-=0.7"
+          { yPercent: 120, rotate: () => gsap.utils.random(-25, 25), scale: 0.6 },
+          { yPercent: 0, rotate: 0, scale: 1, stagger: { each: 0.035, from: "center" }, duration: 1 * d, ease: "back.out(2.2)" },
+          "-=0.6"
         )
-        .to({}, { duration: 0.6 * d })
-        .to(".pre-name .letter", { yPercent: -110, stagger: { each: 0.02, from: "edges" }, duration: 0.6 * d, ease: "expo.in" })
+        .fromTo(
+          ".pre-role",
+          { y: 40, scale: 0.6, rotate: -14, autoAlpha: 0 },
+          { y: 0, scale: 1, rotate: -3, autoAlpha: 1, duration: 0.9 * d, ease: "back.out(2.5)" },
+          "-=0.55"
+        )
+        /* short hold so the name can be read */
+        .to(".pre-inner", { scale: 1.03, duration: 0.5 * d, ease: "sine.inOut" })
+        /* exit: name jumps away, loops fade, the dc flies to the header */
+        .to(".pre-role", { y: 30, autoAlpha: 0, rotate: 10, duration: 0.4 * d, ease: "power2.in" })
+        .to(
+          ".pre-name .letter",
+          { yPercent: -120, rotate: () => gsap.utils.random(-20, 20), stagger: { each: 0.02, from: "edges" }, duration: 0.6 * d, ease: "back.in(1.6)" },
+          "<"
+        )
+        .to(".pre-loops", { autoAlpha: 0, duration: 0.6 * d }, "<0.2")
         .add(() => {
           const from = document.querySelector(preMono)!.getBoundingClientRect();
           const to = document.querySelector(navMono)!.getBoundingClientRect();
@@ -249,25 +277,56 @@ export default function Portfolio() {
             s: to.width / from.width,
           };
         })
-        .to(preMono, { x: () => fly.dx, y: () => fly.dy, scale: () => fly.s, duration: 1.1 * d, ease: "expo.inOut" })
+        .to(preMono, { x: () => fly.dx, y: () => fly.dy, scale: () => fly.s, duration: 1 * d, ease: "expo.inOut" })
         .to(".preloader", { backgroundColor: "rgba(251,227,227,0)", duration: 0.7 * d, ease: "power2.out" }, "-=0.6")
         .set(navMono, { autoAlpha: 1 })
         .set(".preloader", { display: "none" })
         .to(".menu-btn", { scale: 1, rotate: 0, duration: 0.9, ease: "back.out(2)" }, "-=0.5")
         .to(".nav-side", { autoAlpha: 1, y: 0, stagger: 0.08, duration: 0.8, ease: "expo.out" }, "<")
-        .from(".hero-line .letter", { yPercent: 110, stagger: 0.025, duration: 1.1, ease: "expo.out" }, "-=1.1")
+        /* hero entrance */
+        .from(
+          ".hero-line .letter",
+          { yPercent: 115, rotate: () => gsap.utils.random(-12, 12), stagger: 0.025, duration: 1.1, ease: "back.out(1.6)" },
+          "-=1.1"
+        )
         .from(
           ".hero-pill",
-          {
-            y: -260,
-            rotate: (i: number) => [-25, 30, -20][i % 3],
-            autoAlpha: 0,
-            stagger: 0.12,
-            duration: 1.3,
-            ease: "bounce.out",
-          },
+          { y: -260, rotate: (i: number) => [-25, 30, -20][i % 3], autoAlpha: 0, stagger: 0.12, duration: 1.3, ease: "bounce.out" },
           "-=0.6"
-        );
+        )
+        .from(".hero-card--l", { x: "-60vw", rotate: -25, duration: 1.4, ease: "expo.out" }, "-=1.2")
+        .from(".hero-card--r", { x: "60vw", rotate: 25, duration: 1.4, ease: "expo.out" }, "<0.1")
+        .from(".badge", { scale: 0, rotate: -200, duration: 1.2, ease: "back.out(1.8)" }, "<0.3")
+        .from(".hero .banner", { yPercent: 80, autoAlpha: 0, duration: 1.2, ease: "expo.out" }, "<");
+
+      /* start once the page has settled: fonts ready (or 1.5s max) + one clean frame */
+      Promise.race([document.fonts?.ready ?? Promise.resolve(), new Promise((r) => setTimeout(r, 1500))]).then(() =>
+        requestAnimationFrame(() => requestAnimationFrame(() => intro.play()))
+      );
+
+      /* header dc: writes itself again every few seconds, and on hover */
+      const rewrite = () => {
+        if (gsap.isTweening(".logo .mono-path")) return;
+        gsap.fromTo(".logo .mono-path", { strokeDasharray: 1, strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 1.1, ease: "power1.inOut" });
+        gsap.fromTo(".logo .logo-mono", { rotate: -10 }, { rotate: 0, duration: 1.2, ease: "elastic.out(1, 0.4)" });
+      };
+      intro.call(() => {
+        gsap.delayedCall(6, function loop() {
+          if (!document.hidden) rewrite();
+          gsap.delayedCall(7, loop);
+        });
+      });
+      document.querySelector(".logo")?.addEventListener("mouseenter", rewrite);
+
+      /* headline letters jump when touched / hovered */
+      gsap.utils.toArray<HTMLElement>(".hero-line .letter").forEach((el) => {
+        const jump = () => {
+          if (gsap.isTweening(el)) return;
+          gsap.fromTo(el, { y: 0 }, { y: "-0.18em", rotate: gsap.utils.random(-10, 10), duration: 0.22, ease: "power2.out", yoyo: true, repeat: 1 });
+        };
+        el.addEventListener("pointerenter", jump);
+        el.addEventListener("pointerdown", jump);
+      });
 
       /* ═════ HERO ═════ */
       gsap.to(".hero-title", {
@@ -337,6 +396,20 @@ export default function Portfolio() {
       });
       gsap.utils.toArray<HTMLElement>("[data-reveal]").forEach((el) => {
         gsap.from(el, { y: 50, autoAlpha: 0, duration: 1.1, ease: "expo.out", scrollTrigger: { trigger: el, start: "top 92%" } });
+      });
+
+      /* ═════ small labels slide in; slider cards pop in ═════ */
+      gsap.utils.toArray<HTMLElement>(".eyebrow:not([data-reveal])").forEach((el) => {
+        gsap.from(el, { x: -30, autoAlpha: 0, duration: 0.9, ease: "expo.out", scrollTrigger: { trigger: el, start: "top 92%" } });
+      });
+      gsap.from(".strip-card", {
+        scale: 0.7,
+        rotate: (i: number) => (i % 2 ? 8 : -8),
+        autoAlpha: 0,
+        stagger: 0.07,
+        duration: 1,
+        ease: "back.out(1.6)",
+        scrollTrigger: { trigger: ".strip", start: "top 90%" },
       });
 
       /* ═════ PROJECTS: cards rise, middle column runs faster ═════ */
@@ -549,12 +622,17 @@ export default function Portfolio() {
     <div ref={root}>
       {/* ═════ intro ═════ */}
       <div className="preloader" aria-hidden>
+        <svg className="pre-loops" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+          <path pathLength={1} d="M-80 640 C 160 380, 420 760, 560 560 C 700 360, 420 220, 330 380 C 240 540, 620 700, 860 520 C 1100 340, 1000 120, 1180 160 C 1360 200, 1380 420, 1520 380" />
+          <path pathLength={1} d="M1520 760 C 1240 860, 1080 620, 1180 520 C 1280 420, 1420 560, 1300 680 C 1180 800, 860 820, 760 720" />
+        </svg>
         <div className="pre-inner">
           <Monogram className="mono" />
           <div className="pre-name">
             <Letters text={profile.firstName} />
             <Letters text={profile.lastName} />
           </div>
+          <span className="pre-role">{profile.role}</span>
         </div>
       </div>
 
