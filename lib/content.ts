@@ -20,6 +20,7 @@ export const profile = {
   photo: "/images/dewanshi-avatar.png",
   avatar: "/images/dewanshi-avatar.png",
   resume: "/resume/Dewanshi-Chawaldhal-Resume.pdf",
+  resumeImage: "/resume/Dewanshi-Chawaldhal-Resume.jpg",
   // her own words, from the LinkedIn "About" section
   about:
     "I'm a 12th-grade Commerce student at Bhavan's BP Vidyamandir Civil Lines preparing for the IPMAT exam with the goal of getting into an IIM. I'm interested in business management and leadership, and I enjoy working with people and taking initiative. My strengths include communication, team management, and event coordination, and I'm focused on improving myself and growing every day.",
@@ -164,6 +165,8 @@ export const sections = {
   skills: ["What I", "bring"],
   highlightsEyebrow: "Highlights",
   highlights: ["Moments I'm", "proud of"],
+  resumeEyebrow: "Résumé",
+  resume: ["My", "résumé"],
   faqEyebrow: "Frequently asked questions",
   faq: ["Things you", "might ask"],
 };

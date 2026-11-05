@@ -541,6 +541,21 @@ export default function Portfolio() {
         });
       }
 
+      /* ═════ RÉSUMÉ: the sheet rises and straightens as you scroll ═════ */
+      gsap.fromTo(
+        ".resume-sheet",
+        { y: 140, rotate: -6, scale: 0.88 },
+        { y: 0, rotate: -1.5, scale: 1, ease: "none", scrollTrigger: { trigger: ".resume-sheet", start: "top bottom", end: "top 30%", scrub: true } }
+      );
+      gsap.from(".resume-actions .talk", {
+        y: 30,
+        autoAlpha: 0,
+        stagger: 0.1,
+        duration: 0.9,
+        ease: "back.out(2)",
+        scrollTrigger: { trigger: ".resume-actions", start: "top 92%" },
+      });
+
       /* ═════ FAQ doodle ═════ */
       gsap.fromTo(
         ".faq-doodle path",
@@ -615,6 +630,7 @@ export default function Portfolio() {
     { label: "Activities", href: "#work" },
     { label: "Journey", href: "#journey" },
     { label: "Skills", href: "#skills" },
+    { label: "Résumé", href: "#resume" },
     { label: "Contact", href: "#contact" },
   ];
   const go = (href: string) => (e: React.MouseEvent) => {
@@ -796,8 +812,8 @@ export default function Portfolio() {
             <div>
               <small>In her words · LinkedIn</small>
               <p>{profile.about}</p>
-              <a href={profile.resume} download className="talk talk--line resume-btn" data-magnetic>
-                <span>Download my résumé</span>
+              <a href="#resume" onClick={go("#resume")} className="talk talk--line resume-btn" data-magnetic>
+                <span>See my résumé</span>
                 <i>
                   <Arrow />
                 </i>
@@ -955,6 +971,33 @@ export default function Portfolio() {
                 </article>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* ═════ résumé (embedded) ═════ */}
+        <section className="resume" id="resume">
+          <p className="eyebrow">{sections.resumeEyebrow}</p>
+          <h2 className="big-title" data-split>
+            <Letters text={sections.resume[0]} />
+            <Letters text={sections.resume[1]} />
+          </h2>
+          <a href={profile.resume} target="_blank" rel="noreferrer" className="resume-sheet" aria-label="Open the résumé PDF">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={profile.resumeImage} alt={`Résumé of ${profile.firstName} ${profile.lastName}`} width={1588} height={2246} loading="lazy" />
+          </a>
+          <div className="resume-actions">
+            <a href={profile.resume} download className="talk talk--dark" data-magnetic>
+              <span>Download PDF</span>
+              <i>
+                <Arrow />
+              </i>
+            </a>
+            <a href={profile.resume} target="_blank" rel="noreferrer" className="talk talk--line" data-magnetic>
+              <span>Open full size</span>
+              <i>
+                <Arrow />
+              </i>
+            </a>
           </div>
         </section>
 

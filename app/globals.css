@@ -383,3 +383,15 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 @media (max-width: 520px) { .hc-photo { width: 80%; border-width: 2px; box-shadow: 0 0 0 3px var(--cream), 0 0 0 4px var(--ink); } }
 .resume-btn { margin-top: 16px; font-size: 14px; }
 .resume-btn i { width: 34px; height: 34px; }
+
+/* ═════════════ résumé (embedded) ═════════════ */
+.resume { background: var(--pink); padding: clamp(80px, 11vw, 170px) var(--gutter); display: flex; flex-direction: column; align-items: center; overflow: hidden; }
+.resume .big-title { margin-bottom: clamp(36px, 5vw, 70px); }
+.resume-sheet {
+  display: block; width: min(720px, 100%); border-radius: 10px; overflow: hidden; background: #fff;
+  border: 2px solid var(--ink); box-shadow: 12px 12px 0 var(--orange); transition: box-shadow .4s var(--ease);
+}
+.resume-sheet:hover { box-shadow: 16px 16px 0 var(--ink); }
+.resume-sheet img { display: block; width: 100%; height: auto; }
+.resume-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: clamp(30px, 4vw, 50px); }
+@media (max-width: 520px) { .resume-sheet { box-shadow: 6px 6px 0 var(--orange); } }
