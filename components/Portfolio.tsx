@@ -14,7 +14,9 @@ import {
   projects,
   experience,
   services,
-  testimonials,
+  highlights,
+  sections,
+  contactHref,
   faqs,
   footerLine,
   type Project,
@@ -69,7 +71,12 @@ function Arrow() {
 
 function LetsTalk({ className }: { className?: string }) {
   return (
-    <a href={`mailto:${profile.email}`} className={`talk ${className ?? ""}`} data-magnetic>
+    <a
+      href={contactHref}
+      className={`talk ${className ?? ""}`}
+      data-magnetic
+      {...(profile.email ? {} : { target: "_blank", rel: "noreferrer" })}
+    >
       <span>Let&apos;s Talk</span>
       <i>
         <Arrow />
@@ -85,7 +92,7 @@ function Art({ p }: { p: Project }) {
     <div className="art art--ph" style={{ background: p.colors[1], color: p.colors[0] }}>
       <span className="art-cat">{p.category}</span>
       <span className="art-title">{p.title}</span>
-      <span className="art-year">{p.year}</span>
+      <span className="art-year">{p.tag}</span>
     </div>
   );
 }
@@ -605,7 +612,7 @@ export default function Portfolio() {
   const navLinks = [
     { label: "Home", href: "#top" },
     { label: "About", href: "#about" },
-    { label: "Work", href: "#work" },
+    { label: "Activities", href: "#work" },
     { label: "Journey", href: "#journey" },
     { label: "Skills", href: "#skills" },
     { label: "Contact", href: "#contact" },
@@ -640,7 +647,7 @@ export default function Portfolio() {
       <header className="nav">
         <nav className="nav-side nav-links">
           <a href="#work" onClick={go("#work")}>
-            Work
+            Activities
           </a>
           <a href="#about" onClick={go("#about")}>
             About me
@@ -695,7 +702,9 @@ export default function Portfolio() {
           ))}
         </ul>
         <div className="menu-foot">
-          <a href={`mailto:${profile.email}`}>{profile.email}</a>
+          <a href={profile.resume} download>
+            Résumé ↓
+          </a>
           <a href={profile.linkedin} target="_blank" rel="noreferrer">
             LinkedIn ↗
           </a>
@@ -727,11 +736,9 @@ export default function Portfolio() {
             </svg>
 
             <div className="hero-card hero-card--l">
-              <div
-                className={`hero-card-in ${profile.photo ? "has-photo" : ""}`}
-                style={profile.photo ? { backgroundImage: `url(${profile.photo})` } : undefined}
-              >
+              <div className="hero-card-in">
                 <span className="hc-label">Hello, I&apos;m</span>
+                <span className="hc-photo" style={{ backgroundImage: `url(${profile.photo})` }} role="img" aria-label={`${profile.firstName} ${profile.lastName}`} />
                 <span className="hc-name">{profile.firstName}</span>
               </div>
             </div>
@@ -758,7 +765,7 @@ export default function Portfolio() {
         {/* ═════ about ═════ */}
         <section className="about" id="about">
           <p className="eyebrow eyebrow--center" data-reveal>
-            A bit about me
+            {sections.about}
           </p>
           <div className="about-wrap">
             <p className="about-text">
@@ -782,6 +789,23 @@ export default function Portfolio() {
           </div>
         </section>
 
+        {/* her own words from LinkedIn */}
+        <section className="about-more">
+          <div className="about-card" data-reveal>
+            <span className="about-photo" style={{ backgroundImage: `url(${profile.avatar})` }} aria-hidden />
+            <div>
+              <small>In her words · LinkedIn</small>
+              <p>{profile.about}</p>
+              <a href={profile.resume} download className="talk talk--line resume-btn" data-magnetic>
+                <span>Download my résumé</span>
+                <i>
+                  <Arrow />
+                </i>
+              </a>
+            </div>
+          </div>
+        </section>
+
         {/* ═════ slider showcase ═════ */}
         <section className="strip" aria-label="Project previews">
           <div className="strip-track">
@@ -795,11 +819,11 @@ export default function Portfolio() {
 
         {/* ═════ selected works ═════ */}
         <section className="works" id="work">
-          <p className="eyebrow">Featured projects</p>
+          <p className="eyebrow">{sections.workEyebrow}</p>
           <div className="works-stick">
           <h2 className="works-title big-title" data-split>
-            <Letters text="Selected" />
-            <Letters text="Works" />
+            <Letters text={sections.work[0]} />
+            <Letters text={sections.work[1]} />
           </h2>
           <div className="proj-grid">
             {projects.map((p) => {
@@ -815,7 +839,7 @@ export default function Portfolio() {
                     <div className="proj-text">
                       <h3>{p.title}</h3>
                       <span>
-                        {p.category} · {p.year}
+                        {p.category} · {p.tag}
                       </span>
                     </div>
                     <span className="proj-go">
@@ -839,16 +863,18 @@ export default function Portfolio() {
 
           <div className="more">
             <h3 className="more-title" data-split>
-              <Letters text="More work" />
-              <Letters text="on the way" />
+              <Letters text={sections.more[0]} />
+              <Letters text={sections.more[1]} />
             </h3>
             <div className="more-pills">
-              <span className="more-pill">Always creating</span>
-              <span className="more-pill">Stay tuned</span>
-              <span className="more-pill">There&apos;s more</span>
+              {sections.morePills.map((t) => (
+                <span className="more-pill" key={t}>
+                  {t}
+                </span>
+              ))}
             </div>
             <a href={profile.linkedin} target="_blank" rel="noreferrer" className="talk talk--line" data-magnetic>
-              <span>See more on LinkedIn</span>
+              <span>{sections.moreButton}</span>
               <i>
                 <Arrow />
               </i>
@@ -858,10 +884,10 @@ export default function Portfolio() {
 
         {/* ═════ journey ═════ */}
         <section className="journey" id="journey">
-          <p className="eyebrow">Experience &amp; education</p>
+          <p className="eyebrow">{sections.journeyEyebrow}</p>
           <h2 className="big-title big-title--left" data-split>
-            <Letters text="Where" />
-            <Letters text="I've been" />
+            <Letters text={sections.journey[0]} />
+            <Letters text={sections.journey[1]} />
           </h2>
           <div className="exp-list">
             {experience.map((e, i) => (
@@ -876,10 +902,10 @@ export default function Portfolio() {
 
         {/* ═════ services / skills ═════ */}
         <section className="services" id="skills">
-          <p className="eyebrow">What I do</p>
+          <p className="eyebrow">{sections.skillsEyebrow}</p>
           <h2 className="big-title big-title--left" data-split>
-            <Letters text="This is" />
-            <Letters text="my thing" />
+            <Letters text={sections.skills[0]} />
+            <Letters text={sections.skills[1]} />
           </h2>
           <div className="svc-track">
             <svg className="svc-svg" aria-hidden>
@@ -904,16 +930,16 @@ export default function Portfolio() {
           </div>
         </section>
 
-        {/* ═════ recommendations ═════ */}
-        <section className="testimonials" id="kind-words">
-          <p className="eyebrow">Recommendations</p>
+        {/* ═════ highlights (card deck) ═════ */}
+        <section className="testimonials" id="highlights">
+          <p className="eyebrow">{sections.highlightsEyebrow}</p>
           <h2 className="big-title" data-split>
-            <Letters text="Apparently," />
-            <Letters text="they like me" />
+            <Letters text={sections.highlights[0]} />
+            <Letters text={sections.highlights[1]} />
           </h2>
           <div className="t-panel">
             <div className="t-stage">
-              {testimonials.map((t, i) => (
+              {highlights.map((t, i) => (
                 <article className="t-card" key={i}>
                   <h3>{t.headline}</h3>
                   <div className="t-person">
@@ -925,7 +951,7 @@ export default function Portfolio() {
                       <small>{t.role}</small>
                     </span>
                   </div>
-                  <p>{t.quote}</p>
+                  <p>{t.text}</p>
                 </article>
               ))}
             </div>
@@ -935,10 +961,10 @@ export default function Portfolio() {
         {/* ═════ faq ═════ */}
         <section className="faq" id="faq">
           <div className="faq-head">
-            <p className="eyebrow">Frequently asked questions</p>
+            <p className="eyebrow">{sections.faqEyebrow}</p>
             <h2 className="big-title big-title--left" data-split>
-              <Letters text="Things you" />
-              <Letters text="might ask" />
+              <Letters text={sections.faq[0]} />
+              <Letters text={sections.faq[1]} />
             </h2>
             <svg className="faq-doodle" viewBox="0 0 220 160" fill="none" aria-hidden>
               <path pathLength={1} d="M30 40 C30 20 50 10 110 10 C170 10 195 20 195 50 C195 85 170 95 110 95 C95 95 80 95 70 94 L40 120 L48 90 C35 85 30 70 30 40 Z" />
@@ -956,9 +982,7 @@ export default function Portfolio() {
                 <div className="chat-a">
                   <div className="chat-a-in">
                     <p>{f.a}</p>
-                    <span className="chat-avatar">
-                      <Monogram />
-                    </span>
+                    <span className="chat-avatar" style={{ backgroundImage: `url(${profile.avatar})` }} aria-hidden />
                   </div>
                 </div>
               </div>
@@ -981,15 +1005,17 @@ export default function Portfolio() {
             </h2>
             <LetsTalk className="talk--dark" />
             <div className="foot-mail">
-              <small>Email me</small>
-              <a href={`mailto:${profile.email}`}>{profile.email}</a>
+              <small>{profile.email ? "Email me" : "Say hi on LinkedIn"}</small>
+              <a href={contactHref} {...(profile.email ? {} : { target: "_blank", rel: "noreferrer" })}>
+                {profile.email || "linkedin.com/in/dewanshi-chawaldhal"}
+              </a>
             </div>
           </div>
           <div className="foot-cols">
             <div>
               <small>Main menu</small>
               <a href="#work" onClick={go("#work")}>
-                Work
+                Activities
               </a>
               <a href="#about" onClick={go("#about")}>
                 About me
@@ -1000,6 +1026,9 @@ export default function Portfolio() {
             </div>
             <div>
               <small>Socials</small>
+              <a href={profile.resume} download>
+                Résumé ↓
+              </a>
               <a href={profile.linkedin} target="_blank" rel="noreferrer">
                 LinkedIn ↗
               </a>
@@ -1015,11 +1044,11 @@ export default function Portfolio() {
               )}
             </div>
             <p>
-              Made with curiosity.
+              Growing a little
               <br />
-              Pixel by pixel.
+              every single day.
             </p>
-            <p>{profile.location}</p>
+            <p>{profile.locationLong}</p>
           </div>
         </div>
         <div className="foot-bottom">

@@ -237,9 +237,9 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .more-title { display: flex; flex-direction: column; align-items: center; text-transform: uppercase; font-size: clamp(44px, 7vw, 110px); line-height: .88; }
 .more-pills { position: absolute; inset: clamp(100px, 12vw, 180px) 0 auto; height: clamp(100px, 14vw, 200px); pointer-events: none; }
 .more-pill { background: var(--ink); color: var(--cream); }
-.more-pill:nth-child(1) { left: 14%; top: -6%; rotate: -6deg; }
-.more-pill:nth-child(2) { right: 18%; top: 30%; rotate: 5deg; }
-.more-pill:nth-child(3) { left: 22%; bottom: 8%; rotate: -3deg; background: var(--orange); }
+.more-pill:nth-child(1) { left: 4%; top: 2%; rotate: -6deg; }
+.more-pill:nth-child(2) { right: 4%; top: 40%; rotate: 5deg; }
+.more-pill:nth-child(3) { left: 9%; bottom: -12%; rotate: -3deg; background: var(--orange); }
 @media (max-width: 640px) {
   .more-pill:nth-child(1) { left: 2%; }
   .more-pill:nth-child(2) { right: 2%; }
@@ -324,7 +324,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   font-size: 15px; line-height: 1.45; margin: 10px 0 4px; opacity: 0; transform: translateY(12px); transition: opacity .4s .1s, transform .5s .1s var(--ease);
 }
 .chat-item.is-open .chat-a p { opacity: 1; transform: none; }
-.chat-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--orange); color: var(--cream); display: grid; place-items: center; flex-shrink: 0; margin-bottom: 4px; }
+.chat-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--orange) center/cover; border: 2px solid var(--orange); color: var(--cream); display: grid; place-items: center; flex-shrink: 0; margin-bottom: 4px; }
 .chat-avatar svg { width: 28px; }
 
 /* ═════════════ footer ═════════════ */
@@ -358,3 +358,28 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   .more-pill:nth-child(2) { right: 4%; top: 200%; }
   .more-pill:nth-child(3) { left: 4%; top: 196%; bottom: auto; }
 }
+
+/* ═════════════ about: her own words ═════════════ */
+.about-more { background: var(--cream); padding: 0 var(--gutter) clamp(70px, 9vw, 130px); }
+.about-card {
+  max-width: 860px; margin: 0 auto; display: flex; gap: clamp(16px, 2.4vw, 28px); align-items: flex-start;
+  background: #fff; border: 2px solid var(--ink); border-radius: 18px; padding: clamp(18px, 2.6vw, 30px);
+  box-shadow: 8px 8px 0 var(--orange); rotate: -1deg;
+}
+.about-photo { width: clamp(64px, 8vw, 96px); aspect-ratio: 1; border-radius: 50%; background: var(--peach) center/cover; border: 3px solid var(--orange); flex-shrink: 0; }
+.about-card small { display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--orange); margin-bottom: 8px; }
+.about-card p { font-size: clamp(15px, 1.3vw, 18px); line-height: 1.55; font-weight: 500; }
+@media (max-width: 520px) { .about-card { flex-direction: column; rotate: 0deg; box-shadow: 5px 5px 0 var(--orange); } }
+
+/* her round LinkedIn photo, centred in the hero card */
+.hc-photo {
+  display: block; width: 82%; aspect-ratio: 1; margin: 0 auto; border-radius: 50%;
+  background: var(--pink) center / cover no-repeat; border: 3px solid var(--orange);
+  box-shadow: 0 0 0 4px var(--cream), 0 0 0 6px var(--ink);
+}
+.hero-card--l .hero-card-in { align-items: stretch; }
+.hero-card--l .hc-name { text-align: center; }
+.hero-card--l .hc-label { text-align: center; }
+@media (max-width: 520px) { .hc-photo { width: 80%; border-width: 2px; box-shadow: 0 0 0 3px var(--cream), 0 0 0 4px var(--ink); } }
+.resume-btn { margin-top: 16px; font-size: 14px; }
+.resume-btn i { width: 34px; height: 34px; }

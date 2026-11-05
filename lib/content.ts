@@ -1,110 +1,171 @@
 // ─────────────────────────────────────────────────────────────
 // ALL of Dewanshi's content lives in this one file.
-// Anything marked "EDIT" is a placeholder: LinkedIn could not be read
-// automatically, so replace it with her real details.
-// Images: drop files into /public and reference them as "/file.jpg".
+// Source: her LinkedIn profile (headline, About, Education, Skills, Activity).
+// Images live in /public/images.
 // ─────────────────────────────────────────────────────────────
 
 export const profile = {
   firstName: "Dewanshi",
   lastName: "Chawaldhal",
-  role: "Designer & Creative Technologist", // EDIT: LinkedIn headline
-  location: "India", // EDIT: city, country
+  role: "Commerce Student · IPMAT Aspirant",
+  headline: "Commerce Student | IPMAT Aspirant | Interested in Business, Management & Leadership",
+  location: "Nagpur, India",
+  locationLong: "Nagpur, Maharashtra, India",
   timezone: "Asia/Kolkata",
-  availability: "Open to new projects", // EDIT
-  email: "hello@dewanshi.com", // EDIT: real email
+  availability: "IPMAT Aspirant",
+  email: "dewanshi.c06@gmail.com",
   linkedin: "https://www.linkedin.com/in/dewanshi-chawaldhal-23b3813b2",
-  instagram: "", // EDIT (optional) full URL — hidden when empty
-  behance: "", // EDIT (optional) full URL — hidden when empty
-  photo: "" as string, // EDIT: e.g. "/dewanshi.jpg" (shown in the hero card)
-  intro:
-    "I design and build thoughtful digital experiences — where clear thinking, bold visuals and motion meet to tell a story.", // EDIT
+  instagram: "",
+  behance: "",
+  photo: "/images/dewanshi-avatar.png",
+  avatar: "/images/dewanshi-avatar.png",
+  resume: "/resume/Dewanshi-Chawaldhal-Resume.pdf",
+  // her own words, from the LinkedIn "About" section
+  about:
+    "I'm a 12th-grade Commerce student at Bhavan's BP Vidyamandir Civil Lines preparing for the IPMAT exam with the goal of getting into an IIM. I'm interested in business management and leadership, and I enjoy working with people and taking initiative. My strengths include communication, team management, and event coordination, and I'm focused on improving myself and growing every day.",
 };
 
+/** where "Let's Talk" buttons go */
+export const contactHref = profile.email ? `mailto:${profile.email}` : profile.linkedin;
+
 /* ---------- HERO ---------- */
-export const heroLines = ["Designing", "Ridiculously", "Good Work"]; // EDIT
-export const heroPills = ["Portfolio ©2026", "Design & Development", "Based in India"]; // EDIT
-export const bannerWords = ["Good ideas only", "Design with heart", "Let's make magic", "Detail obsessed"]; // EDIT
+export const heroLines = ["Future", "Business", "Leader"];
+export const heroPills = ["Commerce Student", "IPMAT Aspirant", "Nagpur, India"];
+export const bannerWords = ["Communication", "Team Leadership", "Public Speaking", "Growing every day", "Business & Management"];
 
 /* ---------- ABOUT ---------- */
 export const aboutStatement =
-  "I believe good work comes from curiosity. That's why I dig deep into every idea, sweat the small details and keep learning, so every project feels thoughtful, bold and a little bit unexpected."; // EDIT: from her LinkedIn "About"
-export const aboutPills = ["Detail obsessed", "Always learning", "Powered by chai"]; // EDIT
+  "I'm a Commerce student from Nagpur preparing for IPMAT, with my sights set on an IIM. I love working with people, taking initiative and growing a little every single day.";
+export const aboutPills = ["Aiming for an IIM", "People person", "Always growing"];
 
-/* ---------- PROJECTS ---------- */
+/* ---------- BEYOND THE CLASSROOM (cards) ---------- */
 export type Project = {
   title: string;
   category: string;
-  year: string;
+  tag: string;
   description: string;
-  colors: [string, string];
-  image?: string; // e.g. "/work/project-1.jpg"
-  link?: string; // optional URL (LinkedIn post, Behance, live site…)
+  colors: [string, string]; // [accent, background] for cards without an image
+  image?: string;
+  link?: string;
 };
 
-// EDIT: replace with her real projects / LinkedIn posts
 export const projects: Project[] = [
-  { title: "Project One", category: "Brand Identity", year: "2026", description: "A complete visual identity system from logo to motion.", colors: ["#ff8a5c", "#ffd2bd"] },
-  { title: "Project Two", category: "Web Experience", year: "2026", description: "An immersive, scroll-driven website for a product launch.", colors: ["#4f6bff", "#c3ceff"] },
-  { title: "Project Three", category: "Product Design", year: "2025", description: "Designing a calmer mobile experience for everyday tasks.", colors: ["#2fa37a", "#bdf0d9"] },
-  { title: "Project Four", category: "Campaign", year: "2025", description: "A social-first campaign with bold type and motion.", colors: ["#a34fff", "#e2c6ff"] },
-  { title: "Project Five", category: "Illustration", year: "2025", description: "A set of playful illustrations for a young brand.", colors: ["#ffb800", "#fff0b3"] },
-  { title: "Project Six", category: "UI / UX", year: "2024", description: "Research-led redesign of a busy dashboard.", colors: ["#ff4f8b", "#ffc9db"] },
-];
-
-/* ---------- EXPERIENCE (LinkedIn "Experience" + "Education") ---------- */
-export type Experience = { company: string; role: string; period: string };
-export const experience: Experience[] = [
-  { company: "Company Name", role: "Current Role", period: "2025 — Now" }, // EDIT
-  { company: "Company Name", role: "Previous Role", period: "2024 — 2025" }, // EDIT
-  { company: "Company Name", role: "Internship", period: "2023 — 2024" }, // EDIT
-  { company: "University Name", role: "Degree, Field of Study", period: "2021 — 2025" }, // EDIT
-];
-
-/* ---------- SERVICES / SKILLS (drawn along the winding line) ---------- */
-export const services = [
-  { title: "Visual Design", text: "Layouts, colour and type that make ideas impossible to ignore." },
-  { title: "Brand Identity", text: "Logos and visual systems with a personality of their own." },
-  { title: "UI / UX Design", text: "Interfaces that look great, feel right and are easy to use." },
-  { title: "Web Development", text: "Fast, responsive websites brought to life with code." },
-  { title: "Motion", text: "Because standing still just isn't enough." },
-  { title: "Research", text: "Asking the right questions before drawing a single line." },
-]; // EDIT: her LinkedIn skills
-
-/* ---------- RECOMMENDATIONS (LinkedIn "Recommendations") ---------- */
-// EDIT: paste real recommendations from her LinkedIn. These are placeholders.
-export const testimonials = [
   {
-    headline: "Worked with Dewanshi? Your words belong here.",
-    quote: "Recommendations from her LinkedIn will appear on these cards. Replace this card's text with a real one.",
-    name: "This could be you",
-    role: "Recommend Dewanshi on LinkedIn",
-    avatar: "", // optional "/people/name.jpg"
+    title: "Model United Nations",
+    category: "Debate & Diplomacy",
+    tag: "MUN",
+    description: "Researching global issues, speaking up and negotiating with other delegates.",
+    colors: ["#ff5a00", "#ffd9c7"],
   },
   {
-    headline: "Teammates, teachers, clients — every kind word counts.",
-    quote: "Paste a recommendation from her LinkedIn profile here, with the person's name and role below.",
-    name: "Your name",
-    role: "Your role, your company",
+    title: "Event Committee",
+    category: "Event Coordination",
+    tag: "School",
+    description: "Planning and running school events — coordinating people, timelines and details.",
+    colors: ["#d62839", "#ffd3d8"],
+  },
+  {
+    title: "The Consistent Academy",
+    category: "Team Member",
+    tag: "2026",
+    description: "Welcomed to the team at The Consistent Academy.",
+    colors: ["#5b3fd6", "#e3dcff"],
+    image: "/images/consistent-academy-welcome.jpg",
+    link: "https://www.linkedin.com/in/dewanshi-chawaldhal-23b3813b2/recent-activity/all/",
+  },
+  {
+    title: "Basketball",
+    category: "School Sports Team",
+    tag: "Team sport",
+    description: "Teamwork, quick decisions and staying calm under pressure.",
+    colors: ["#ff7a1a", "#fde3cb"],
+  },
+  {
+    title: "Golf",
+    category: "School Sports Team",
+    tag: "Focus",
+    description: "Patience, focus and always competing with my last best.",
+    colors: ["#1f7a4c", "#d3eedd"],
+  },
+  {
+    title: "Volunteering",
+    category: "Community",
+    tag: "Giving back",
+    description: "Giving my time to causes and the community around me.",
+    colors: ["#c2185b", "#fbd3e4"],
+  },
+];
+
+/* ---------- JOURNEY (Education & experience) ---------- */
+export type Experience = { company: string; role: string; period: string };
+export const experience: Experience[] = [
+  { company: "IPMAT Preparation", role: "Goal: a seat at an IIM", period: "Next" },
+  { company: "Bhavan's BP Vidyamandir", role: "Grade 12 · Commerce · Civil Lines, Nagpur", period: "Now" },
+  { company: "Bhavans College", role: "Business / Commerce, General", period: "Grade 11 – 12" },
+  { company: "The Consistent Academy", role: "Team Member", period: "2026" },
+];
+
+/* ---------- SKILLS (drawn along the winding line) — from her 14 LinkedIn skills ---------- */
+export const services = [
+  { title: "Communication", text: "Communication and public speaking — saying things clearly, and listening even better." },
+  { title: "Team Leadership", text: "Leading with energy and taking initiative when it counts." },
+  { title: "Coordination", text: "Team, project and event coordination — keeping people and plans in sync." },
+  { title: "Problem Solving", text: "Getting to the root cause, and solving problems together as a team." },
+  { title: "Networking", text: "Meeting new people and building genuine connections." },
+  { title: "Adaptability", text: "Easily adaptable — comfortable with change and quick to find my feet." },
+];
+
+/* ---------- HIGHLIGHTS (shuffling card deck) ---------- */
+export const highlights = [
+  {
+    headline: "Welcome to the team!",
+    text: "Joined The Consistent Academy, whose founder welcomed every member as “a voice, a vision, and a valued part” of the community.",
+    name: "The Consistent Academy",
+    role: "Team member · 2026",
+    avatar: "/images/consistent-academy-welcome.jpg",
+  },
+  {
+    headline: "Finding my voice at MUN",
+    text: "Taking part in Model United Nations — researching global issues, debating and negotiating as a delegate.",
+    name: "Model United Nations",
+    role: "Bharatiya Vidya Bhavan's",
     avatar: "",
   },
   {
-    headline: "Good work speaks. Good people speak about it.",
-    quote: "Three to five recommendations look best. Delete any card you don't need.",
-    name: "Your name",
-    role: "Your role, your company",
+    headline: "Team player, on and off the court",
+    text: "Part of the school basketball and golf teams, a member of the event committee, and a volunteer.",
+    name: "Sports, Events & Volunteering",
+    role: "Bharatiya Vidya Bhavan's",
     avatar: "",
   },
 ];
 
 /* ---------- FAQ (chat-style) ---------- */
 export const faqs = [
-  { q: "What do you do?", a: "I design and build digital experiences — from brand visuals to websites — with a big focus on detail and motion." }, // EDIT
-  { q: "Are you open to new opportunities?", a: "Yes! I'm open to full-time roles, internships and freelance projects. The best way to reach me is email or LinkedIn." }, // EDIT
-  { q: "What tools do you use?", a: "Figma for design, plus code and motion tools to bring ideas to life." }, // EDIT
-  { q: "Can you work with an existing brand?", a: "Absolutely — I enjoy building something new just as much as making something good even better." },
-  { q: "Where are you based?", a: "I'm based in India and happy to work with people anywhere in the world." }, // EDIT
-  { q: "How can we start?", a: "Send me a message with a bit about your idea, and we'll take it from there." },
+  { q: "Who are you?", a: "I'm Dewanshi — a 12th-grade Commerce student at Bhavan's BP Vidyamandir, Civil Lines, in Nagpur." },
+  { q: "What are you working towards?", a: "I'm preparing for the IPMAT exam, with the goal of getting into an IIM." },
+  { q: "What interests you?", a: "Business, management and leadership — and working with people to make things happen." },
+  { q: "What are your strengths?", a: "Communication, team management and event coordination. I like taking initiative." },
+  { q: "What do you do outside class?", a: "Model United Nations, the event committee, basketball and golf, and volunteering." },
+  { q: "How can I reach you?", a: "Send me a message on LinkedIn — I'd love to connect!" },
 ];
 
-export const footerLine = ["Alright, that's", "the whole", "portfolio"]; // EDIT
+/* ---------- SECTION HEADINGS ---------- */
+export const sections = {
+  about: "A bit about me",
+  workEyebrow: "Beyond the classroom",
+  work: ["What I", "get up to"],
+  more: ["More chapters", "on the way"],
+  morePills: ["Aiming for an IIM", "Always learning", "Growing every day"],
+  moreButton: "Follow my journey on LinkedIn",
+  journeyEyebrow: "Education & journey",
+  journey: ["My", "journey"],
+  skillsEyebrow: "Skills",
+  skills: ["What I", "bring"],
+  highlightsEyebrow: "Highlights",
+  highlights: ["Moments I'm", "proud of"],
+  faqEyebrow: "Frequently asked questions",
+  faq: ["Things you", "might ask"],
+};
+
+export const footerLine = ["Okay, that's", "enough about", "me"];

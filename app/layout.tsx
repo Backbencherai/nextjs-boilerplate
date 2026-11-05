@@ -9,7 +9,7 @@ const sans = Inter_Tight({ variable: "--font-sans", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: `${profile.firstName} ${profile.lastName} — Portfolio`,
-  description: profile.intro,
+  description: profile.headline,
 };
 
 export const viewport: Viewport = {
