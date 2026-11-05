@@ -73,22 +73,13 @@ function LetsTalk({ className }: { className?: string }) {
 }
 
 function Art({ p }: { p: Project }) {
+  /* real image when provided, otherwise a clean typographic placeholder card */
+  if (p.image) return <div className="art" style={{ backgroundImage: `url(${p.image})` }} />;
   return (
-    <div
-      className="art"
-      style={{
-        backgroundImage: p.image
-          ? `url(${p.image})`
-          : `radial-gradient(circle at 30% 30%, ${p.colors[1]}, ${p.colors[0]} 72%)`,
-      }}
-    >
-      {!p.image && (
-        <>
-          <span className="art-shape art-shape--1" />
-          <span className="art-shape art-shape--2" />
-          <span className="art-title">{p.title}</span>
-        </>
-      )}
+    <div className="art art--ph" style={{ background: p.colors[1], color: p.colors[0] }}>
+      <span className="art-cat">{p.category}</span>
+      <span className="art-title">{p.title}</span>
+      <span className="art-year">{p.year}</span>
     </div>
   );
 }
@@ -192,8 +183,14 @@ export default function Portfolio() {
     /* ---------- curved ribbons ---------- */
     let offset = 0;
     let velocity = 0;
+    let lastY = 0;
+    const nav = document.querySelector<HTMLElement>(".nav");
     lenis.on("scroll", (l: Lenis) => {
       velocity = l.velocity;
+      const y = l.scroll;
+      if (y > 160 && y > lastY + 2) nav?.classList.add("nav--hidden");
+      else if (y < lastY - 2 || y <= 160) nav?.classList.remove("nav--hidden");
+      lastY = y;
     });
     const banners = Array.from(document.querySelectorAll<SVGTextPathElement>("[data-banner]"));
     const unitLen = banners.map((tp) => {

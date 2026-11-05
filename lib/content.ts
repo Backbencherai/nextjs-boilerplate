@@ -75,24 +75,24 @@ export const services = [
 // EDIT: paste real recommendations from her LinkedIn. These are placeholders.
 export const testimonials = [
   {
-    headline: "Add a short highlight from a LinkedIn recommendation here",
-    quote: "Paste the full recommendation text from LinkedIn here. It will show on this card, and the cards shuffle as visitors scroll.",
-    name: "Recommender Name",
-    role: "Role, Company",
+    headline: "Worked with Dewanshi? Your words belong here.",
+    quote: "Recommendations from her LinkedIn will appear on these cards. Replace this card's text with a real one.",
+    name: "This could be you",
+    role: "Recommend Dewanshi on LinkedIn",
     avatar: "", // optional "/people/name.jpg"
   },
   {
-    headline: "A second recommendation goes on this card",
-    quote: "Replace this with another recommendation from a manager, teammate, teacher or client.",
-    name: "Recommender Name",
-    role: "Role, Company",
+    headline: "Teammates, teachers, clients — every kind word counts.",
+    quote: "Paste a recommendation from her LinkedIn profile here, with the person's name and role below.",
+    name: "Your name",
+    role: "Your role, your company",
     avatar: "",
   },
   {
-    headline: "And a third one goes here",
-    quote: "Three to five recommendations work best. Remove this card if there are fewer.",
-    name: "Recommender Name",
-    role: "Role, Company",
+    headline: "Good work speaks. Good people speak about it.",
+    quote: "Three to five recommendations look best. Delete any card you don't need.",
+    name: "Your name",
+    role: "Your role, your company",
     avatar: "",
   },
 ];

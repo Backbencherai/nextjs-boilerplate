@@ -75,7 +75,9 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   position: fixed; top: 0; left: 0; right: 0; z-index: 100;
   display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px;
   padding: calc(14px + env(safe-area-inset-top, 0px)) var(--gutter) 14px; pointer-events: none;
+  transition: transform .6s var(--ease);
 }
+.nav--hidden { transform: translateY(-110%); }
 .nav > * { pointer-events: auto; }
 .nav-links { display: flex; gap: 6px; }
 .nav-links a { font-size: 14px; font-weight: 500; padding: 8px 14px; border-radius: 99px; background: rgba(248, 238, 232, .7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: background .3s, color .3s; }
@@ -200,10 +202,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .strip-card { width: clamp(200px, 28vw, 440px); aspect-ratio: 1; border-radius: 12px; overflow: hidden; flex-shrink: 0; }
 
 .art { position: relative; width: 100%; height: 100%; background-size: cover; background-position: center; display: grid; place-items: center; overflow: hidden; transition: transform 1s var(--ease); }
-.art-shape { position: absolute; border-radius: 50%; mix-blend-mode: soft-light; background: #fff; }
-.art-shape--1 { width: 60%; aspect-ratio: 1; left: -12%; bottom: -18%; opacity: .5; }
-.art-shape--2 { width: 34%; aspect-ratio: 1; right: 8%; top: 10%; opacity: .7; border-radius: 30%; rotate: 20deg; }
-.art-title { position: relative; text-transform: uppercase; color: var(--ink); font-size: clamp(30px, 4.6vw, 80px); line-height: .9; text-align: center; padding: 0 8%; }
+.art--ph { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; padding: clamp(14px, 1.8vw, 24px); }
+.art-cat, .art-year { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.art-year { align-self: flex-end; }
+.art-title { text-transform: uppercase; font-size: clamp(34px, 4.2vw, 72px); line-height: .86; text-align: left; }
 
 /* ═════════════ selected works ═════════════ */
 .works { background: var(--cream); padding: clamp(40px, 6vw, 80px) var(--gutter) clamp(80px, 10vw, 160px); }
@@ -335,4 +337,15 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 @media (prefers-reduced-motion: reduce) {
   .menu, .menu li, .chat-a, .svc-item, .svc-item p { transition: none; }
+}
+
+/* phones: smaller pills that sit in the gaps instead of covering words */
+@media (max-width: 640px) {
+  .hero-pill, .more-pill, .about-pill { font-size: 11px; padding: .8em 1.3em; }
+  .hero-pill--0 { top: -9%; left: auto; right: 6%; }
+  .hero-pill--1 { top: 31%; left: 2%; }
+  .hero-pill--2 { top: auto; bottom: -13%; right: 8%; }
+  .more-pill:nth-child(1) { left: 2%; top: -22%; }
+  .more-pill:nth-child(2) { right: 4%; top: 200%; }
+  .more-pill:nth-child(3) { left: 4%; top: 196%; bottom: auto; }
 }
