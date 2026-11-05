@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Anton, Inter_Tight } from "next/font/google";
+import { Anybody, Inter_Tight } from "next/font/google";
 import "./globals.css";
 import { profile } from "@/lib/content";
 
-const display = Anton({ variable: "--font-display", subsets: ["latin"], weight: "400" });
+/* Anybody: variable width + weight, used condensed & heavy for display type */
+const display = Anybody({ variable: "--font-display", subsets: ["latin"], axes: ["wdth"] });
 const sans = Inter_Tight({ variable: "--font-sans", subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -11,7 +12,12 @@ export const metadata: Metadata = {
   description: profile.intro,
 };
 
-export const viewport: Viewport = { themeColor: "#fbe3e3" };
+export const viewport: Viewport = {
+  themeColor: "#fbe3e3",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export default function RootLayout({
   children,

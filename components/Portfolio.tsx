@@ -14,13 +14,15 @@ import {
   projects,
   experience,
   services,
-  stats,
+  testimonials,
+  faqs,
+  footerLine,
   type Project,
 } from "@/lib/content";
 
 gsap.registerPlugin(ScrollTrigger);
 
-/* ---------- small pieces ---------- */
+/* ═════════════════════════ small building blocks ═════════════════════════ */
 
 function Letters({ text, className }: { text: string; className?: string }) {
   return (
@@ -34,42 +36,50 @@ function Letters({ text, className }: { text: string; className?: string }) {
   );
 }
 
-/** Hand-drawn "dc" monogram — a single stroked path that can be drawn on. */
+/** Hand-drawn "dc" monogram: the d and the c are separate strokes so they can draw in turn. */
 function Monogram({ className }: { className?: string }) {
+  const common = {
+    stroke: "currentColor",
+    strokeWidth: 9,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    pathLength: 1,
+  };
   return (
     <svg className={className} viewBox="0 0 140 110" fill="none" aria-hidden>
-      {/* "d" — drawn first, on its own */}
-      <path
-        className="mono-path mono-d"
-        pathLength={1}
-        d="M62 14 V88 C62 96 70 98 74 90 M62 58 C58 44 26 42 22 66 C19 86 44 98 62 80"
-        stroke="currentColor"
-        strokeWidth={9}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* "c" */}
-      <path
-        className="mono-path mono-c"
-        pathLength={1}
-        d="M126 54 C114 40 86 44 86 66 C86 90 112 96 128 80"
-        stroke="currentColor"
-        strokeWidth={9}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path className="mono-path mono-d" d="M62 14 V88 C62 96 70 98 74 90 M62 58 C58 44 26 42 22 66 C19 86 44 98 62 80" {...common} />
+      <path className="mono-path mono-c" d="M126 54 C114 40 86 44 86 66 C86 90 112 96 128 80" {...common} />
     </svg>
   );
 }
 
-function Art({ p, big }: { p: Project; big?: boolean }) {
+function Arrow() {
+  return (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden>
+      <path d="M7 17 L17 7 M9 7 H17 V15" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function LetsTalk({ className }: { className?: string }) {
+  return (
+    <a href={`mailto:${profile.email}`} className={`talk ${className ?? ""}`} data-magnetic>
+      <span>Let&apos;s Talk</span>
+      <i>
+        <Arrow />
+      </i>
+    </a>
+  );
+}
+
+function Art({ p }: { p: Project }) {
   return (
     <div
-      className={`art ${big ? "art--big" : ""}`}
+      className="art"
       style={{
         backgroundImage: p.image
           ? `url(${p.image})`
-          : `radial-gradient(circle at 30% 30%, ${p.colors[1]}, ${p.colors[0]} 70%)`,
+          : `radial-gradient(circle at 30% 30%, ${p.colors[1]}, ${p.colors[0]} 72%)`,
       }}
     >
       {!p.image && (
@@ -83,7 +93,7 @@ function Art({ p, big }: { p: Project; big?: boolean }) {
   );
 }
 
-/** Thick orange ribbon with text running along a curve, driven by scroll. */
+/** Thick ribbon with text running along a curve; driven by time + scroll speed. */
 function CurvedBanner({ id, flip }: { id: string; flip?: boolean }) {
   const text = Array(8)
     .fill(bannerWords.map((w) => `${w}  •  `).join(""))
@@ -103,16 +113,43 @@ function CurvedBanner({ id, flip }: { id: string; flip?: boolean }) {
   );
 }
 
-/* ---------- page ---------- */
+function useClock(timezone: string) {
+  const [time, setTime] = useState("");
+  useEffect(() => {
+    const fmt = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: timezone });
+    const tick = () => setTime(fmt.format(new Date()));
+    tick();
+    const id = setInterval(tick, 15_000);
+    return () => clearInterval(id);
+  }, [timezone]);
+  return time;
+}
+
+const initials = (name: string) =>
+  name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+/* ═════════════════════════════════ page ═════════════════════════════════ */
 
 export default function Portfolio() {
   const root = useRef<HTMLDivElement>(null);
   const lenisRef = useRef<Lenis | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [nameOpen, setNameOpen] = useState(false);
+  const [openFaq, setOpenFaq] = useState(0);
   const nameTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const time = useClock(profile.timezone);
 
-  /* logo click: the name slides out beside the "dc" mark, then tucks away again */
+  const scrollTo = (target: string | number) => {
+    setMenuOpen(false);
+    lenisRef.current?.scrollTo(target, { duration: 1.6 });
+  };
+
+  /* logo click: the dc redraws and the name slides out, then tucks away again */
   const toggleName = () => {
     if (nameTimer.current) clearTimeout(nameTimer.current);
     setNameOpen((open) => {
@@ -125,18 +162,23 @@ export default function Portfolio() {
       { strokeDashoffset: 0, duration: 0.6, stagger: 0.35, ease: "power2.inOut" }
     );
   };
-  useEffect(() => () => {
-    if (nameTimer.current) clearTimeout(nameTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (nameTimer.current) clearTimeout(nameTimer.current);
+    },
+    []
+  );
 
-  const scrollTo = (target: string | number) => {
-    setMenuOpen(false);
-    lenisRef.current?.scrollTo(target, { duration: 1.6 });
-  };
+  /* FAQ open/close changes page height → let ScrollTrigger re-measure after the transition */
+  useEffect(() => {
+    const id = setTimeout(() => ScrollTrigger.refresh(), 520);
+    return () => clearTimeout(id);
+  }, [openFaq]);
 
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+    /* ---------- smooth scroll ---------- */
     const lenis = new Lenis({ duration: 1.15, smoothWheel: !reduce });
     lenisRef.current = lenis;
     lenis.on("scroll", ScrollTrigger.update);
@@ -144,9 +186,10 @@ export default function Portfolio() {
     gsap.ticker.add(raf);
     gsap.ticker.lagSmoothing(0);
     lenis.stop();
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
     window.scrollTo(0, 0);
 
-    /* curved banners: always drifting, faster while scrolling */
+    /* ---------- curved ribbons ---------- */
     let offset = 0;
     let velocity = 0;
     lenis.on("scroll", (l: Lenis) => {
@@ -155,7 +198,7 @@ export default function Portfolio() {
     const banners = Array.from(document.querySelectorAll<SVGTextPathElement>("[data-banner]"));
     const unitLen = banners.map((tp) => {
       try {
-        return tp.getComputedTextLength() / 8;
+        return tp.getComputedTextLength() / 8 || 1500;
       } catch {
         return 1500;
       }
@@ -163,7 +206,7 @@ export default function Portfolio() {
     const bannerTick = () => {
       offset += reduce ? 0 : 1.1 + Math.min(Math.abs(velocity), 60) * 0.5;
       banners.forEach((tp, i) => {
-        const len = unitLen[i] || 1500;
+        const len = unitLen[i];
         const o = offset % len;
         tp.setAttribute("startOffset", String(i % 2 ? -len + o : -o));
       });
@@ -171,7 +214,16 @@ export default function Portfolio() {
     gsap.ticker.add(bannerTick);
 
     const ctx = gsap.context(() => {
-      /* ===== PRELOADER: monogram draws, name pops, curtain lifts ===== */
+      const d = reduce ? 0.25 : 1;
+
+      /* ═════ INTRO: d draws → c joins → full name → dc flies into the header ═════ */
+      const preMono = ".preloader .mono";
+      const navMono = ".nav .logo-mono";
+      gsap.set(navMono, { autoAlpha: 0 });
+      gsap.set(".nav-side", { autoAlpha: 0, y: -20 });
+      gsap.set(".menu-btn", { scale: 0, rotate: -90 });
+      let fly = { dx: 0, dy: 0, s: 1 };
+
       const intro = gsap.timeline({
         onComplete: () => {
           lenis.start();
@@ -179,63 +231,34 @@ export default function Portfolio() {
           ScrollTrigger.refresh();
         },
       });
-      const preMono = ".preloader .mono";
-      const navMono = ".nav .logo-mono";
-      const d = reduce ? 0.25 : 1;
-      gsap.set(navMono, { autoAlpha: 0 });
-      gsap.set(".menu-btn", { scale: 0, rotate: -90 });
-
-      /* centre point → position/scale needed to land exactly on the header logo */
-      const flyTo = () => {
-        const from = document.querySelector(preMono)!.getBoundingClientRect();
-        const to = document.querySelector(navMono)!.getBoundingClientRect();
-        return {
-          dx: to.left + to.width / 2 - (from.left + from.width / 2),
-          dy: to.top + to.height / 2 - (from.top + from.height / 2),
-          s: to.width / from.width,
-        };
-      };
-      let fly = { dx: 0, dy: 0, s: 1 };
-
       intro
-        /* 1 — the "d" draws alone in the centre, then the "c" joins it */
         .set(".preloader .mono-path", { strokeDasharray: 1, strokeDashoffset: 1 })
         .to(".preloader .mono-d", { strokeDashoffset: 0, duration: 1.1 * d, ease: "power2.inOut" }, 0.2)
         .to(".preloader .mono-c", { strokeDashoffset: 0, duration: 0.7 * d, ease: "power2.inOut" }, "-=0.25")
         .fromTo(preMono, { scale: 0.9 }, { scale: 1, duration: 0.9 * d, ease: "elastic.out(1, 0.45)" }, "-=0.2")
-        /* 2 — her full name builds around the mark, letters bursting from the centre */
         .from(
           ".pre-name .letter",
           { yPercent: 110, rotate: 8, stagger: { each: 0.03, from: "center" }, duration: 0.9 * d, ease: "expo.out" },
           "-=0.7"
         )
         .to({}, { duration: 0.6 * d })
-        /* 3 — name drops away, the dc flies into the header, the pink lifts into the hero */
-        .to(".pre-name .letter", {
-          yPercent: -110,
-          stagger: { each: 0.02, from: "edges" },
-          duration: 0.6 * d,
-          ease: "expo.in",
-        })
+        .to(".pre-name .letter", { yPercent: -110, stagger: { each: 0.02, from: "edges" }, duration: 0.6 * d, ease: "expo.in" })
         .add(() => {
-          fly = flyTo();
+          const from = document.querySelector(preMono)!.getBoundingClientRect();
+          const to = document.querySelector(navMono)!.getBoundingClientRect();
+          fly = {
+            dx: to.left + to.width / 2 - (from.left + from.width / 2),
+            dy: to.top + to.height / 2 - (from.top + from.height / 2),
+            s: to.width / from.width,
+          };
         })
-        .to(preMono, {
-          x: () => fly.dx,
-          y: () => fly.dy,
-          scale: () => fly.s,
-          duration: 1.1 * d,
-          ease: "expo.inOut",
-        })
+        .to(preMono, { x: () => fly.dx, y: () => fly.dy, scale: () => fly.s, duration: 1.1 * d, ease: "expo.inOut" })
         .to(".preloader", { backgroundColor: "rgba(251,227,227,0)", duration: 0.7 * d, ease: "power2.out" }, "-=0.6")
         .set(navMono, { autoAlpha: 1 })
         .set(".preloader", { display: "none" })
         .to(".menu-btn", { scale: 1, rotate: 0, duration: 0.9, ease: "back.out(2)" }, "-=0.5")
-        .from(
-          ".hero-line .letter",
-          { yPercent: 110, stagger: 0.025, duration: 1.1, ease: "expo.out" },
-          "-=1.1"
-        )
+        .to(".nav-side", { autoAlpha: 1, y: 0, stagger: 0.08, duration: 0.8, ease: "expo.out" }, "<")
+        .from(".hero-line .letter", { yPercent: 110, stagger: 0.025, duration: 1.1, ease: "expo.out" }, "-=1.1")
         .from(
           ".hero-pill",
           {
@@ -249,7 +272,7 @@ export default function Portfolio() {
           "-=0.6"
         );
 
-      /* ===== HERO scroll ===== */
+      /* ═════ HERO ═════ */
       gsap.to(".hero-title", {
         yPercent: -20,
         ease: "none",
@@ -267,31 +290,28 @@ export default function Portfolio() {
         );
       });
       gsap.to(".badge-ring", { rotate: 360, duration: 14, repeat: -1, ease: "none", transformOrigin: "50% 50%" });
+      /* cards "walk": a constant sway, plus scroll lift */
       gsap.utils.toArray<HTMLElement>(".hero-card").forEach((card, i) => {
         gsap.fromTo(
           card,
-          { y: 120, rotate: i ? 14 : -14 },
-          {
-            y: 0,
-            rotate: i ? 5 : -5,
-            ease: "none",
-            scrollTrigger: { trigger: ".hero-visual", start: "top bottom", end: "center 60%", scrub: true },
-          }
+          { y: 120 },
+          { y: 0, ease: "none", scrollTrigger: { trigger: ".hero-visual", start: "top bottom", end: "center 60%", scrub: true } }
+        );
+        gsap.fromTo(
+          card.querySelector(".hero-card-in"),
+          { rotate: i ? 3 : -7, yPercent: 0 },
+          { rotate: i ? 7 : -3, yPercent: -3, duration: 0.55, ease: "sine.inOut", yoyo: true, repeat: -1, delay: i * 0.27 }
         );
       });
 
-      /* ===== WORK STRIP: horizontal drift with scroll ===== */
+      /* ═════ SLIDER STRIP ═════ */
       gsap.fromTo(
         ".strip-track",
         { xPercent: 0 },
-        {
-          xPercent: -30,
-          ease: "none",
-          scrollTrigger: { trigger: ".strip", start: "top bottom", end: "bottom top", scrub: true },
-        }
+        { xPercent: -30, ease: "none", scrollTrigger: { trigger: ".strip", start: "top bottom", end: "bottom top", scrub: true } }
       );
 
-      /* ===== ABOUT: letters go peach -> orange -> black ===== */
+      /* ═════ ABOUT: letters peach → orange → black ═════ */
       gsap.to(".about-text .ch", {
         keyframes: [{ color: "#ff5a00" }, { color: "#111010" }],
         stagger: 0.04,
@@ -308,115 +328,190 @@ export default function Portfolio() {
         scrollTrigger: { trigger: ".about-text", start: "bottom 70%" },
       });
 
-      /* ===== split headings & reveals ===== */
+      /* ═════ generic: split headings, reveals ═════ */
       gsap.utils.toArray<HTMLElement>("[data-split]").forEach((el) => {
         gsap.from(el.querySelectorAll(".letter"), {
           yPercent: 110,
-          stagger: 0.03,
+          stagger: 0.025,
           duration: 1.1,
           ease: "expo.out",
-          scrollTrigger: { trigger: el, start: "top 85%" },
+          scrollTrigger: { trigger: el, start: "top 88%" },
         });
       });
       gsap.utils.toArray<HTMLElement>("[data-reveal]").forEach((el) => {
-        gsap.from(el, {
-          y: 50,
-          autoAlpha: 0,
-          duration: 1.1,
-          ease: "expo.out",
-          scrollTrigger: { trigger: el, start: "top 92%" },
-        });
+        gsap.from(el, { y: 50, autoAlpha: 0, duration: 1.1, ease: "expo.out", scrollTrigger: { trigger: el, start: "top 92%" } });
       });
 
-      /* ===== WORK cards: grow in + inner parallax ===== */
-      gsap.utils.toArray<HTMLElement>(".work-card").forEach((card) => {
-        gsap.fromTo(
-          card,
-          { scale: 0.85, borderRadius: 48 },
-          {
-            scale: 1,
-            borderRadius: 14,
-            ease: "none",
-            scrollTrigger: { trigger: card, start: "top bottom", end: "top 30%", scrub: true },
-          }
-        );
-        const art = card.querySelector(".art");
-        if (art)
+      /* ═════ PROJECTS: cards rise, middle column runs faster ═════ */
+      gsap.utils.toArray<HTMLElement>(".proj").forEach((card) => {
+        gsap.from(card, {
+          y: 120,
+          rotate: 3,
+          autoAlpha: 0,
+          duration: 1.2,
+          ease: "expo.out",
+          scrollTrigger: { trigger: card, start: "top 95%" },
+        });
+      });
+      const mm = gsap.matchMedia();
+      mm.add("(min-width: 900px)", () => {
+        gsap.utils.toArray<HTMLElement>(".proj:nth-child(3n+2) .proj-media").forEach((media) => {
           gsap.fromTo(
-            art,
-            { yPercent: -8 },
-            {
-              yPercent: 8,
-              ease: "none",
-              scrollTrigger: { trigger: card, start: "top bottom", end: "bottom top", scrub: true },
-            }
+            media,
+            { y: 60 },
+            { y: -60, ease: "none", scrollTrigger: { trigger: media, start: "top bottom", end: "bottom top", scrub: true } }
           );
+        });
+      });
+      gsap.from(".more-pill", {
+        y: -240,
+        rotate: (i: number) => [20, -25, 15][i % 3],
+        autoAlpha: 0,
+        stagger: 0.15,
+        duration: 1.2,
+        ease: "bounce.out",
+        scrollTrigger: { trigger: ".more", start: "top 70%" },
       });
 
-      /* ===== JOURNEY rows ===== */
+      /* ═════ JOURNEY ═════ */
       gsap.utils.toArray<HTMLElement>(".exp-row").forEach((row) => {
-        gsap.from(row, {
-          y: 60,
-          autoAlpha: 0,
-          duration: 1,
-          ease: "expo.out",
-          scrollTrigger: { trigger: row, start: "top 92%" },
-        });
+        gsap.from(row, { y: 60, autoAlpha: 0, duration: 1, ease: "expo.out", scrollTrigger: { trigger: row, start: "top 92%" } });
       });
 
-      /* ===== SERVICES stacked cards ===== */
-      const cards = gsap.utils.toArray<HTMLElement>(".service-card");
-      cards.forEach((card, i) => {
-        if (i === cards.length - 1) return;
-        gsap.to(card, {
-          scale: 0.92,
-          rotate: i % 2 ? 2 : -2,
-          ease: "none",
-          scrollTrigger: { trigger: cards[i + 1], start: "top bottom", end: "top 20%", scrub: true },
+      /* ═════ SERVICES: a winding line draws itself, skills light up as it passes ═════ */
+      const track = document.querySelector<HTMLElement>(".svc-track");
+      const svg = document.querySelector<SVGSVGElement>(".svc-svg");
+      const base = document.querySelector<SVGPathElement>(".svc-base");
+      const line = document.querySelector<SVGPathElement>(".svc-line");
+      const head = document.querySelector<HTMLElement>(".svc-head");
+      const items = gsap.utils.toArray<HTMLElement>(".svc-item");
+      if (track && svg && base && line && head && items.length) {
+        let len = 0;
+        let stops: number[] = [];
+        const layout = () => {
+          const W = track.clientWidth;
+          const H = track.clientHeight;
+          const pts = items.map((el) => [(parseFloat(el.dataset.x!) / 100) * W, (parseFloat(el.dataset.y!) / 100) * H]);
+          const dy = H / (items.length + 1) / 1.6;
+          let dStr = `M ${W * 1.05} ${-H * 0.02} C ${W * 0.9} ${pts[0][1] * 0.2}, ${pts[0][0] + W * 0.2} ${pts[0][1] - dy}, ${pts[0][0]} ${pts[0][1]}`;
+          for (let i = 1; i < pts.length; i++) {
+            const [ax, ay] = pts[i - 1];
+            const [bx, by] = pts[i];
+            dStr += ` C ${ax + (ax - bx) * 0.35} ${ay + dy}, ${bx + (bx - ax) * 0.35} ${by - dy}, ${bx} ${by}`;
+          }
+          const [lx, ly] = pts[pts.length - 1];
+          dStr += ` C ${lx} ${ly + dy}, ${W * 0.5} ${H * 0.98}, ${W * 0.5} ${H}`;
+          svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+          base.setAttribute("d", dStr);
+          line.setAttribute("d", dStr);
+          len = line.getTotalLength();
+          line.style.strokeDasharray = `${len}`;
+          /* where along the path each skill sits */
+          stops = pts.map(([x, y]) => {
+            let best = 0;
+            let bestD = Infinity;
+            for (let s = 0; s <= 400; s++) {
+              const p = line.getPointAtLength((s / 400) * len);
+              const dd = (p.x - x) ** 2 + (p.y - y) ** 2;
+              if (dd < bestD) {
+                bestD = dd;
+                best = s / 400;
+              }
+            }
+            return best;
+          });
+        };
+        const draw = (prog: number) => {
+          if (!len) return;
+          line.style.strokeDashoffset = `${len * (1 - prog)}`;
+          const p = line.getPointAtLength(len * prog);
+          gsap.set(head, { x: p.x, y: p.y });
+          items.forEach((el, i) => el.classList.toggle("is-on", prog >= stops[i] - 0.015));
+        };
+        layout();
+        ScrollTrigger.create({
+          trigger: track,
+          start: "top 70%",
+          end: "bottom 60%",
+          onRefreshInit: layout,
+          onRefresh: (self) => draw(self.progress),
+          onUpdate: (self) => draw(self.progress),
         });
-      });
+        draw(0);
+      }
 
-      /* ===== STATS ===== */
-      gsap.utils.toArray<HTMLElement>(".stat-num").forEach((el) => {
-        const o = { v: 0 };
-        gsap.to(o, {
-          v: Number(el.dataset.value),
-          duration: 2,
-          ease: "power3.out",
-          scrollTrigger: { trigger: el, start: "top 88%" },
-          onUpdate: () => {
-            el.textContent = String(Math.round(o.v));
+      /* ═════ RECOMMENDATIONS: pinned deck, top card flies off each step ═════ */
+      const cards = gsap.utils.toArray<HTMLElement>(".t-card");
+      if (cards.length > 1) {
+        gsap.set(cards, { rotate: (i: number) => (i ? (i % 2 ? 4 : -4) : -1.5), zIndex: (i: number) => cards.length - i });
+        const tl = gsap.timeline({
+          scrollTrigger: {
+            trigger: ".testimonials",
+            start: "top top",
+            end: () => `+=${(cards.length - 1) * 70}%`,
+            pin: true,
+            scrub: 1,
+            anticipatePin: 1,
+            invalidateOnRefresh: true,
           },
         });
-      });
+        cards.slice(0, -1).forEach((card, i) => {
+          tl.to(card, { yPercent: -150, xPercent: i % 2 ? 30 : -30, rotate: i % 2 ? 18 : -18, ease: "power2.in", duration: 1 }).to(
+            cards[i + 1],
+            { rotate: 0, duration: 0.6, ease: "power2.out" },
+            "-=0.6"
+          );
+        });
+      }
 
-      /* ===== CONTACT ===== */
-      gsap.from(".contact-title .letter", {
+      /* ═════ FAQ doodle ═════ */
+      gsap.fromTo(
+        ".faq-doodle path",
+        { strokeDasharray: 1, strokeDashoffset: 1 },
+        { strokeDashoffset: 0, stagger: 0.2, duration: 1.6, ease: "power2.inOut", scrollTrigger: { trigger: ".faq", start: "top 70%" } }
+      );
+
+      /* ═════ FOOTER ═════ */
+      gsap.from(".foot-title .letter", {
         yPercent: 110,
-        stagger: 0.04,
-        duration: 1.1,
+        stagger: 0.015,
+        duration: 1,
         ease: "expo.out",
-        scrollTrigger: { trigger: ".contact-title", start: "top 85%" },
+        scrollTrigger: { trigger: ".foot", start: "top 75%" },
       });
+      gsap.fromTo(
+        ".foot-mono .mono-path",
+        { strokeDasharray: 1, strokeDashoffset: 1 },
+        {
+          strokeDashoffset: 0,
+          ease: "none",
+          stagger: 0.3,
+          scrollTrigger: { trigger: ".foot-mono", start: "top bottom", end: "bottom bottom", scrub: true },
+        }
+      );
+      gsap.fromTo(
+        ".foot-loops path",
+        { strokeDasharray: 1, strokeDashoffset: 1 },
+        { strokeDashoffset: 0, ease: "none", scrollTrigger: { trigger: ".foot", start: "top bottom", end: "bottom bottom", scrub: true } }
+      );
     }, root);
 
-    /* magnetic buttons */
-    const magnets = Array.from(document.querySelectorAll<HTMLElement>("[data-magnetic]"));
+    /* ---------- magnetic buttons (mouse only) ---------- */
+    const fine = window.matchMedia("(pointer: fine)").matches;
+    const magnets = fine ? Array.from(document.querySelectorAll<HTMLElement>("[data-magnetic]")) : [];
     const handlers = magnets.map((el) => {
       const move = (e: MouseEvent) => {
         const r = el.getBoundingClientRect();
-        gsap.to(el, {
-          x: (e.clientX - r.left - r.width / 2) * 0.3,
-          y: (e.clientY - r.top - r.height / 2) * 0.3,
-          duration: 0.5,
-          ease: "power3.out",
-        });
+        gsap.to(el, { x: (e.clientX - r.left - r.width / 2) * 0.3, y: (e.clientY - r.top - r.height / 2) * 0.3, duration: 0.5, ease: "power3.out" });
       };
       const leave = () => gsap.to(el, { x: 0, y: 0, duration: 1, ease: "elastic.out(1, 0.35)" });
       el.addEventListener("mousemove", move);
       el.addEventListener("mouseleave", leave);
       return { el, move, leave };
     });
+
+    /* fonts can change text sizes after load */
+    document.fonts?.ready.then(() => ScrollTrigger.refresh());
 
     return () => {
       ctx.revert();
@@ -441,13 +536,21 @@ export default function Portfolio() {
     { label: "Home", href: "#top" },
     { label: "About", href: "#about" },
     { label: "Work", href: "#work" },
-    { label: "Journey", href: "#experience" },
+    { label: "Journey", href: "#journey" },
+    { label: "Skills", href: "#skills" },
     { label: "Contact", href: "#contact" },
   ];
+  const go = (href: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    scrollTo(href === "#top" ? 0 : href);
+  };
+
+  /* zig-zag positions (in %) for skills along the winding line */
+  const svcPos = services.map((_, i) => ({ x: i % 2 ? 31 : 69, y: ((i + 0.8) / (services.length + 0.4)) * 100 }));
 
   return (
     <div ref={root}>
-      {/* ===== preloader ===== */}
+      {/* ═════ intro ═════ */}
       <div className="preloader" aria-hidden>
         <div className="pre-inner">
           <Monogram className="mono" />
@@ -458,8 +561,17 @@ export default function Portfolio() {
         </div>
       </div>
 
-      {/* ===== nav ===== */}
+      {/* ═════ header ═════ */}
       <header className="nav">
+        <nav className="nav-side nav-links">
+          <a href="#work" onClick={go("#work")}>
+            Work
+          </a>
+          <a href="#about" onClick={go("#about")}>
+            About me
+          </a>
+        </nav>
+
         <button
           className={`logo ${nameOpen ? "is-open" : ""}`}
           onClick={toggleName}
@@ -475,6 +587,17 @@ export default function Portfolio() {
             ))}
           </span>
         </button>
+
+        <div className="nav-side nav-right">
+          <span className="nav-avail">
+            {profile.availability}
+            <br />
+            {profile.location}
+            {time ? ` · ${time}` : ""}
+          </span>
+          <LetsTalk />
+        </div>
+
         <button
           className={`menu-btn ${menuOpen ? "is-open" : ""}`}
           onClick={() => setMenuOpen((o) => !o)}
@@ -489,14 +612,8 @@ export default function Portfolio() {
       <div className={`menu ${menuOpen ? "is-open" : ""}`}>
         <ul>
           {navLinks.map((l, i) => (
-            <li key={l.href} style={{ transitionDelay: menuOpen ? `${0.2 + i * 0.06}s` : "0s" }}>
-              <a
-                href={l.href}
-                onClick={(e) => {
-                  e.preventDefault();
-                  scrollTo(l.href === "#top" ? 0 : l.href);
-                }}
-              >
+            <li key={l.href} style={{ transitionDelay: menuOpen ? `${0.2 + i * 0.05}s` : "0s" }}>
+              <a href={l.href} onClick={go(l.href)}>
                 {l.label}
               </a>
             </li>
@@ -511,7 +628,7 @@ export default function Portfolio() {
       </div>
 
       <main id="top">
-        {/* ===== hero ===== */}
+        {/* ═════ hero ═════ */}
         <section className="hero">
           <h1 className="hero-title">
             {heroLines.map((line) => (
@@ -534,12 +651,14 @@ export default function Portfolio() {
               <path pathLength={1} d="M440 60 C 260 60, 220 280, 330 320 C 440 360, 430 170, 300 200 C 170 230, 230 480, 420 560" />
             </svg>
 
-            <div
-              className={`hero-card hero-card--l ${profile.photo ? "has-photo" : ""}`}
-              style={profile.photo ? { backgroundImage: `url(${profile.photo})` } : undefined}
-            >
-              <span className="hc-label">Hello, I&apos;m</span>
-              <span className="hc-name">{profile.firstName}</span>
+            <div className="hero-card hero-card--l">
+              <div
+                className={`hero-card-in ${profile.photo ? "has-photo" : ""}`}
+                style={profile.photo ? { backgroundImage: `url(${profile.photo})` } : undefined}
+              >
+                <span className="hc-label">Hello, I&apos;m</span>
+                <span className="hc-name">{profile.firstName}</span>
+              </div>
             </div>
             <div className="badge">
               <svg className="badge-ring" viewBox="0 0 200 200" aria-hidden>
@@ -551,28 +670,19 @@ export default function Portfolio() {
               <span className="badge-arrow">↓</span>
             </div>
             <div className="hero-card hero-card--r">
-              <span className="hc-label">{profile.role}</span>
-              <span className="hc-name">{profile.lastName}</span>
+              <div className="hero-card-in">
+                <span className="hc-label">{profile.role}</span>
+                <span className="hc-name">{profile.lastName}</span>
+              </div>
             </div>
           </div>
 
           <CurvedBanner id="curve-1" />
         </section>
 
-        {/* ===== work strip ===== */}
-        <section className="strip" aria-label="Project previews">
-          <div className="strip-track">
-            {[...projects, ...projects].map((p, i) => (
-              <div className="strip-card" key={i}>
-                <Art p={p} />
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ===== about ===== */}
+        {/* ═════ about ═════ */}
         <section className="about" id="about">
-          <p className="eyebrow" data-reveal>
+          <p className="eyebrow eyebrow--center" data-reveal>
             A bit about me
           </p>
           <div className="about-wrap">
@@ -595,41 +705,88 @@ export default function Portfolio() {
               </span>
             ))}
           </div>
-          <p className="about-sub" data-reveal>
-            {profile.about}
-          </p>
         </section>
 
-        {/* ===== selected works ===== */}
-        <section className="works" id="work">
-          <h2 className="big-title" data-split>
-            <Letters text="Selected" />
-            <Letters text="Works" />
-          </h2>
-          <div className="work-list">
-            {projects.map((p) => (
-              <article className="work-item" key={p.title}>
-                <div className="work-card">
-                  <Art p={p} big />
-                </div>
-                <div className="work-meta" data-reveal>
-                  <h3>{p.title}</h3>
-                  <span className="work-tag">{p.category}</span>
-                  <span className="work-tag">{p.year}</span>
-                </div>
-                <p className="work-desc" data-reveal>
-                  {p.description}
-                </p>
-              </article>
+        {/* ═════ slider showcase ═════ */}
+        <section className="strip" aria-label="Project previews">
+          <div className="strip-track">
+            {[...projects, ...projects].map((p, i) => (
+              <div className="strip-card" key={i}>
+                <Art p={p} />
+              </div>
             ))}
           </div>
         </section>
 
-        {/* ===== journey ===== */}
-        <section className="journey" id="experience">
-          <h2 className="big-title" data-split>
-            <Letters text="The" />
-            <Letters text="Journey" />
+        {/* ═════ selected works ═════ */}
+        <section className="works" id="work">
+          <p className="eyebrow">Featured projects</p>
+          <div className="works-stick">
+          <h2 className="works-title big-title" data-split>
+            <Letters text="Selected" />
+            <Letters text="Works" />
+          </h2>
+          <div className="proj-grid">
+            {projects.map((p) => {
+              const inner = (
+                <>
+                  <div className="proj-media">
+                    <Art p={p} />
+                  </div>
+                  <div className="proj-meta">
+                    <span className="proj-icon" style={{ background: p.colors[0] }}>
+                      {p.title[0]}
+                    </span>
+                    <div className="proj-text">
+                      <h3>{p.title}</h3>
+                      <span>
+                        {p.category} · {p.year}
+                      </span>
+                    </div>
+                    <span className="proj-go">
+                      <Arrow />
+                    </span>
+                  </div>
+                </>
+              );
+              return p.link ? (
+                <a className="proj" key={p.title} href={p.link} target="_blank" rel="noreferrer">
+                  {inner}
+                </a>
+              ) : (
+                <div className="proj" key={p.title}>
+                  {inner}
+                </div>
+              );
+            })}
+          </div>
+          </div>
+
+          <div className="more">
+            <h3 className="more-title" data-split>
+              <Letters text="More work" />
+              <Letters text="on the way" />
+            </h3>
+            <div className="more-pills">
+              <span className="more-pill">Always creating</span>
+              <span className="more-pill">Stay tuned</span>
+              <span className="more-pill">There&apos;s more</span>
+            </div>
+            <a href={profile.linkedin} target="_blank" rel="noreferrer" className="talk talk--line" data-magnetic>
+              <span>See more on LinkedIn</span>
+              <i>
+                <Arrow />
+              </i>
+            </a>
+          </div>
+        </section>
+
+        {/* ═════ journey ═════ */}
+        <section className="journey" id="journey">
+          <p className="eyebrow">Experience &amp; education</p>
+          <h2 className="big-title big-title--left" data-split>
+            <Letters text="Where" />
+            <Letters text="I've been" />
           </h2>
           <div className="exp-list">
             {experience.map((e, i) => (
@@ -642,16 +799,29 @@ export default function Portfolio() {
           </div>
         </section>
 
-        {/* ===== services ===== */}
-        <section className="services">
-          <h2 className="big-title" data-split>
-            <Letters text="What" />
-            <Letters text="I Do" />
+        {/* ═════ services / skills ═════ */}
+        <section className="services" id="skills">
+          <p className="eyebrow">What I do</p>
+          <h2 className="big-title big-title--left" data-split>
+            <Letters text="This is" />
+            <Letters text="my thing" />
           </h2>
-          <div className="service-stack">
+          <div className="svc-track">
+            <svg className="svc-svg" aria-hidden>
+              <path className="svc-base" />
+              <path className="svc-line" />
+            </svg>
+            <div className="svc-head" aria-hidden>
+              <Monogram />
+            </div>
             {services.map((s, i) => (
-              <div className="service-card" key={s.title} style={{ top: `${14 + i * 4}vh` }}>
-                <span className="service-num">0{i + 1}</span>
+              <div
+                className={`svc-item ${i % 2 ? "svc-item--l" : "svc-item--r"}`}
+                key={s.title}
+                data-x={svcPos[i].x}
+                data-y={svcPos[i].y}
+                style={{ left: `${svcPos[i].x}%`, top: `${svcPos[i].y}%` }}
+              >
                 <h3>{s.title}</h3>
                 <p>{s.text}</p>
               </div>
@@ -659,46 +829,131 @@ export default function Portfolio() {
           </div>
         </section>
 
-        {/* ===== stats ===== */}
-        <section className="stats">
-          {stats.map((s) => (
-            <div className="stat" key={s.label} data-reveal>
-              <div className="stat-value">
-                <span className="stat-num" data-value={s.value}>
-                  0
-                </span>
-                {s.suffix}
-              </div>
-              <div className="stat-label">{s.label}</div>
+        {/* ═════ recommendations ═════ */}
+        <section className="testimonials" id="kind-words">
+          <p className="eyebrow">Recommendations</p>
+          <h2 className="big-title" data-split>
+            <Letters text="Apparently," />
+            <Letters text="they like me" />
+          </h2>
+          <div className="t-panel">
+            <div className="t-stage">
+              {testimonials.map((t, i) => (
+                <article className="t-card" key={i}>
+                  <h3>{t.headline}</h3>
+                  <div className="t-person">
+                    <span className="t-avatar" style={t.avatar ? { backgroundImage: `url(${t.avatar})` } : undefined}>
+                      {!t.avatar && initials(t.name)}
+                    </span>
+                    <span>
+                      <strong>{t.name}</strong>
+                      <small>{t.role}</small>
+                    </span>
+                  </div>
+                  <p>{t.quote}</p>
+                </article>
+              ))}
             </div>
-          ))}
+          </div>
+        </section>
+
+        {/* ═════ faq ═════ */}
+        <section className="faq" id="faq">
+          <div className="faq-head">
+            <p className="eyebrow">Frequently asked questions</p>
+            <h2 className="big-title big-title--left" data-split>
+              <Letters text="Things you" />
+              <Letters text="might ask" />
+            </h2>
+            <svg className="faq-doodle" viewBox="0 0 220 160" fill="none" aria-hidden>
+              <path pathLength={1} d="M30 40 C30 20 50 10 110 10 C170 10 195 20 195 50 C195 85 170 95 110 95 C95 95 80 95 70 94 L40 120 L48 90 C35 85 30 70 30 40 Z" />
+              <path pathLength={1} d="M95 38 C95 26 125 24 126 40 C127 52 110 52 110 64" />
+              <path pathLength={1} d="M110 78 L110 79" />
+              <path pathLength={1} d="M150 120 C165 112 180 130 168 140 C156 150 140 140 150 120 Z" />
+            </svg>
+          </div>
+          <div className="chat">
+            {faqs.map((f, i) => (
+              <div className={`chat-item ${openFaq === i ? "is-open" : ""}`} key={f.q} data-reveal>
+                <button className="chat-q" onClick={() => setOpenFaq(openFaq === i ? -1 : i)} aria-expanded={openFaq === i}>
+                  {f.q}
+                </button>
+                <div className="chat-a">
+                  <div className="chat-a-in">
+                    <p>{f.a}</p>
+                    <span className="chat-avatar">
+                      <Monogram />
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
       </main>
 
-      {/* ===== contact ===== */}
-      <footer className="contact" id="contact">
-        <CurvedBanner id="curve-2" flip />
-        <div className="contact-inner">
-          <p className="eyebrow eyebrow--light">Got an idea?</p>
-          <h2 className="contact-title">
-            <Letters text="Let's" />
-            <Letters text="Talk" />
-          </h2>
-          <div className="contact-actions">
-            <a href={`mailto:${profile.email}`} className="btn btn--dark" data-magnetic>
-              Say hello →
-            </a>
-            <a href={profile.linkedin} target="_blank" rel="noreferrer" className="btn btn--line" data-magnetic>
-              LinkedIn ↗
-            </a>
+      {/* ═════ footer ═════ */}
+      <footer className="foot" id="contact">
+        <svg className="foot-loops" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden>
+          <path pathLength={1} d="M-50 300 C 200 100, 420 420, 260 520 C 120 610, 80 380, 330 360 C 600 340, 520 760, 820 700 C 1060 650, 980 420, 1180 430 C 1380 440, 1300 760, 1500 820" />
+        </svg>
+        <div className="foot-grid">
+          <div className="foot-main">
+            <h2 className="foot-title">
+              {footerLine.map((l) => (
+                <Letters key={l} text={l} />
+              ))}
+            </h2>
+            <LetsTalk className="talk--dark" />
+            <div className="foot-mail">
+              <small>Email me</small>
+              <a href={`mailto:${profile.email}`}>{profile.email}</a>
+            </div>
           </div>
-          <div className="footer">
-            <span>
-              © {new Date().getFullYear()} {profile.firstName} {profile.lastName}
-            </span>
-            <button onClick={() => scrollTo(0)}>Back to top ↑</button>
+          <div className="foot-cols">
+            <div>
+              <small>Main menu</small>
+              <a href="#work" onClick={go("#work")}>
+                Work
+              </a>
+              <a href="#about" onClick={go("#about")}>
+                About me
+              </a>
+              <a href="#skills" onClick={go("#skills")}>
+                Skills
+              </a>
+            </div>
+            <div>
+              <small>Socials</small>
+              <a href={profile.linkedin} target="_blank" rel="noreferrer">
+                LinkedIn ↗
+              </a>
+              {profile.instagram && (
+                <a href={profile.instagram} target="_blank" rel="noreferrer">
+                  Instagram ↗
+                </a>
+              )}
+              {profile.behance && (
+                <a href={profile.behance} target="_blank" rel="noreferrer">
+                  Behance ↗
+                </a>
+              )}
+            </div>
+            <p>
+              Made with curiosity.
+              <br />
+              Pixel by pixel.
+            </p>
+            <p>{profile.location}</p>
           </div>
         </div>
+        <div className="foot-bottom">
+          <span>
+            © {new Date().getFullYear()} {profile.firstName} {profile.lastName}
+          </span>
+          <button onClick={() => scrollTo(0)}>Back to top ↑</button>
+        </div>
+        <Monogram className="foot-mono" />
       </footer>
     </div>
   );
