@@ -44,7 +44,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   display: grid; place-items: center;
 }
 .pre-inner { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.mono { width: clamp(110px, 18vw, 180px); height: auto; }
+.mono { width: clamp(110px, 18vw, 180px); height: auto; will-change: transform; }
+.preloader .mono-path { stroke-dasharray: 1; stroke-dashoffset: 1; }
 .pre-name {
   display: flex; flex-direction: column; align-items: center;
   font-family: var(--font-display), Impact, sans-serif; text-transform: uppercase;

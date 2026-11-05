@@ -38,10 +38,21 @@ function Letters({ text, className }: { text: string; className?: string }) {
 function Monogram({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 140 110" fill="none" aria-hidden>
+      {/* "d" — drawn first, on its own */}
       <path
-        className="mono-path"
+        className="mono-path mono-d"
         pathLength={1}
-        d="M62 14 V88 C62 96 70 98 74 90 M62 58 C58 44 26 42 22 66 C19 86 44 98 62 80 M126 54 C114 40 86 44 86 66 C86 90 112 96 128 80"
+        d="M62 14 V88 C62 96 70 98 74 90 M62 58 C58 44 26 42 22 66 C19 86 44 98 62 80"
+        stroke="currentColor"
+        strokeWidth={9}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* "c" */}
+      <path
+        className="mono-path mono-c"
+        pathLength={1}
+        d="M126 54 C114 40 86 44 86 66 C86 90 112 96 128 80"
         stroke="currentColor"
         strokeWidth={9}
         strokeLinecap="round"
@@ -111,7 +122,7 @@ export default function Portfolio() {
     gsap.fromTo(
       ".logo .mono-path",
       { strokeDasharray: 1, strokeDashoffset: 1 },
-      { strokeDashoffset: 0, duration: 0.9, ease: "power2.inOut" }
+      { strokeDashoffset: 0, duration: 0.6, stagger: 0.35, ease: "power2.inOut" }
     );
   };
   useEffect(() => () => {
@@ -168,26 +179,62 @@ export default function Portfolio() {
           ScrollTrigger.refresh();
         },
       });
+      const preMono = ".preloader .mono";
+      const navMono = ".nav .logo-mono";
+      const d = reduce ? 0.25 : 1;
+      gsap.set(navMono, { autoAlpha: 0 });
+      gsap.set(".menu-btn", { scale: 0, rotate: -90 });
+
+      /* centre point → position/scale needed to land exactly on the header logo */
+      const flyTo = () => {
+        const from = document.querySelector(preMono)!.getBoundingClientRect();
+        const to = document.querySelector(navMono)!.getBoundingClientRect();
+        return {
+          dx: to.left + to.width / 2 - (from.left + from.width / 2),
+          dy: to.top + to.height / 2 - (from.top + from.height / 2),
+          s: to.width / from.width,
+        };
+      };
+      let fly = { dx: 0, dy: 0, s: 1 };
+
       intro
-        .fromTo(
-          ".preloader .mono-path",
-          { strokeDasharray: 1, strokeDashoffset: 1 },
-          { strokeDashoffset: 0, duration: reduce ? 0.2 : 1.6, ease: "power2.inOut" }
-        )
-        .to(".preloader .mono", { scale: 0.6, duration: 0.7, ease: "expo.inOut" })
+        /* 1 — the "d" draws alone in the centre, then the "c" joins it */
+        .set(".preloader .mono-path", { strokeDasharray: 1, strokeDashoffset: 1 })
+        .to(".preloader .mono-d", { strokeDashoffset: 0, duration: 1.1 * d, ease: "power2.inOut" }, 0.2)
+        .to(".preloader .mono-c", { strokeDashoffset: 0, duration: 0.7 * d, ease: "power2.inOut" }, "-=0.25")
+        .fromTo(preMono, { scale: 0.9 }, { scale: 1, duration: 0.9 * d, ease: "elastic.out(1, 0.45)" }, "-=0.2")
+        /* 2 — her full name builds around the mark, letters bursting from the centre */
         .from(
           ".pre-name .letter",
-          { yPercent: 110, stagger: 0.035, duration: 0.8, ease: "expo.out" },
-          "-=0.35"
+          { yPercent: 110, rotate: 8, stagger: { each: 0.03, from: "center" }, duration: 0.9 * d, ease: "expo.out" },
+          "-=0.7"
         )
-        .to({}, { duration: 0.45 })
-        .to(".pre-inner", { scale: 0.9, autoAlpha: 0, duration: 0.6, ease: "expo.in" })
-        .to(".preloader", { yPercent: -100, duration: 1.1, ease: "expo.inOut" }, "-=0.15")
-        .from(".nav", { yPercent: -120, duration: 1, ease: "expo.out" }, "-=0.5")
+        .to({}, { duration: 0.6 * d })
+        /* 3 — name drops away, the dc flies into the header, the pink lifts into the hero */
+        .to(".pre-name .letter", {
+          yPercent: -110,
+          stagger: { each: 0.02, from: "edges" },
+          duration: 0.6 * d,
+          ease: "expo.in",
+        })
+        .add(() => {
+          fly = flyTo();
+        })
+        .to(preMono, {
+          x: () => fly.dx,
+          y: () => fly.dy,
+          scale: () => fly.s,
+          duration: 1.1 * d,
+          ease: "expo.inOut",
+        })
+        .to(".preloader", { backgroundColor: "rgba(251,227,227,0)", duration: 0.7 * d, ease: "power2.out" }, "-=0.6")
+        .set(navMono, { autoAlpha: 1 })
+        .set(".preloader", { display: "none" })
+        .to(".menu-btn", { scale: 1, rotate: 0, duration: 0.9, ease: "back.out(2)" }, "-=0.5")
         .from(
           ".hero-line .letter",
           { yPercent: 110, stagger: 0.025, duration: 1.1, ease: "expo.out" },
-          "-=0.9"
+          "-=1.1"
         )
         .from(
           ".hero-pill",
