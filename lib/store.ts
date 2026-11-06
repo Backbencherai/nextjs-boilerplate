@@ -5,6 +5,7 @@ import { xpFor } from "./game/xp";
 import { computeUniverse, type Universe } from "./game/stats";
 import { ACH_BY_ID } from "./game/achievements";
 import { makeBackend, readCache, writeCache, type Backend, type WorldPos } from "./sync/backend";
+import { loadSyncConfig } from "./sync/config";
 import { SECRETS } from "./game/secrets";
 
 export type TimerKind = "study" | "workout" | "meditation";
@@ -195,9 +196,13 @@ export const useStore = create<State>((set, get) => {
 
     hydrate() {
       const p = readPrefs();
-      set({ hydrated: true, me: p.me ?? null, space: p.space ?? null, introSeen: !!p.introSeen, timer: p.timer ?? null, night: !!p.night });
-      if (p.me && p.space) connect();
-      else set({ ready: true });
+      set({ me: p.me ?? null, space: p.space ?? null, introSeen: !!p.introSeen, timer: p.timer ?? null, night: !!p.night });
+      // read sync settings first so the right backend (cloud or local) is chosen
+      loadSyncConfig().finally(() => {
+        set({ hydrated: true });
+        if (p.me && p.space) connect();
+        else set({ ready: true });
+      });
     },
     setIdentity(me, space) {
       writePrefs({ me, space });

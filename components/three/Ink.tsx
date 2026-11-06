@@ -18,6 +18,7 @@ function toonGradient() {
   return gradient;
 }
 
+const ws = new THREE.Vector3();
 const outlineMat = new THREE.MeshBasicMaterial({ color: INK, side: THREE.BackSide });
 const NO_HULL = new Set(["CircleGeometry", "RingGeometry", "PlaneGeometry"]);
 
@@ -55,10 +56,11 @@ export function Ink({ wash = 0.72, line = 0.035 }: { wash?: number; line?: numbe
         m.material = toon;
         if (!src.transparent && !m.userData.noLine && !NO_HULL.has(m.geometry.type)) {
           m.geometry.computeBoundingSphere();
-          const r = Math.max(0.02, m.geometry.boundingSphere?.radius ?? 1);
+          m.getWorldScale(ws);
+          const r = Math.max(0.02, (m.geometry.boundingSphere?.radius ?? 1) * Math.max(ws.x, ws.y, ws.z));
           const hull = new THREE.Mesh(m.geometry, outlineMat);
           hull.userData.hull = true;
-          hull.scale.setScalar(1 + line / r);
+          hull.scale.setScalar(1 + Math.min(0.12, line / r));
           hull.raycast = () => {};
           m.add(hull);
         }

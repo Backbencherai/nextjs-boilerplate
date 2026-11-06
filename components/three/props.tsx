@@ -3,6 +3,7 @@ import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { useMemo, useRef, type ReactNode } from "react";
 import * as THREE from "three";
 import { seeded } from "@/lib/game/dates";
+import { Asset } from "./assets";
 
 type V3 = [number, number, number];
 type Clickable = { onClick?: (e: ThreeEvent<MouseEvent>) => void };
@@ -12,7 +13,7 @@ const flat = (color: string, extra: Partial<THREE.MeshStandardMaterialParameters
 );
 
 /* ───────── Floating island ───────── */
-export function Island({
+function IslandProc({
   position,
   radius,
   grass = "#86c95b",
@@ -101,7 +102,7 @@ export function Bridge({ from, to, onGround }: { from: [number, number]; to: [nu
 }
 
 /* ───────── Nature ───────── */
-export function Tree({ position, scale = 1, color = "#5fae4a", variant = 0 }: { position: V3; scale?: number; color?: string; variant?: number }) {
+function TreeProc({ position, scale = 1, color = "#5fae4a", variant = 0 }: { position: V3; scale?: number; color?: string; variant?: number }) {
   return (
     <group position={position} scale={scale}>
       <mesh position={[0, 0.45, 0]} castShadow>
@@ -135,7 +136,7 @@ export function Tree({ position, scale = 1, color = "#5fae4a", variant = 0 }: { 
   );
 }
 
-export function Rock({ position, scale = 1 }: { position: V3; scale?: number }) {
+function RockProc({ position, scale = 1 }: { position: V3; scale?: number }) {
   return (
     <mesh position={position} scale={scale} castShadow rotation={[0.3, position[0], 0.1]}>
       <dodecahedronGeometry args={[0.3, 0]} />
@@ -159,7 +160,7 @@ export function Flower({ position, color }: { position: V3; color: string }) {
   );
 }
 
-export function Cloud({ position, scale = 1, speed = 0.2 }: { position: V3; scale?: number; speed?: number }) {
+function CloudProc({ position, scale = 1, speed = 0.2 }: { position: V3; scale?: number; speed?: number }) {
   const g = useRef<THREE.Group>(null);
   const x0 = position[0];
   useFrame(({ clock }) => {
@@ -699,4 +700,51 @@ export function Sign({ position, rotation = 0, color }: { position: V3; rotation
       </mesh>
     </group>
   );
+}
+
+/* ───────── Blender-asset versions (procedural ones above are the fallbacks) ───────── */
+
+type IslandProps = Parameters<typeof IslandProc>[0];
+export function Island(props: IslandProps) {
+  const { position, radius, seed = "isle", onGround, children } = props;
+  const variant = seed.length % 2 ? "Island_A" : "Island_B";
+  return (
+    <group position={position}>
+      <Asset name={variant} scale={radius} fallback={<IslandProc {...props} position={[0, 0, 0]} children={null} />} />
+      {/* flat, invisible walk surface for taps */}
+      <mesh position={[0, -0.02, 0]} onClick={onGround} userData={{ noLine: true }}>
+        <cylinderGeometry args={[radius, radius, 0.06, 32]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+      {children}
+    </group>
+  );
+}
+
+export function Tree({ position, scale = 1, color, variant = 0 }: { position: V3; scale?: number; color?: string; variant?: number }) {
+  const blossom = !!color && /^#f/i.test(color);
+  const name = blossom ? "Tree_Blossom" : variant % 2 ? "Tree_Pine" : "Tree_Round";
+  return <Asset name={name} position={position} scale={scale} rotation={[0, (position[0] * 7 + position[2] * 3) % 6.28, 0]} fallback={<TreeProc position={position} scale={scale} color={color} variant={variant} />} />;
+}
+
+export function Rock({ position, scale = 1 }: { position: V3; scale?: number }) {
+  const name = Math.round(Math.abs(position[0] * 10 + position[2] * 3)) % 2 ? "Rock_A" : "Rock_B";
+  return <Asset name={name} position={position} scale={scale} rotation={[0, position[0], 0]} fallback={<RockProc position={position} scale={scale} />} />;
+}
+
+export function Cloud({ position, scale = 1, speed = 0.2 }: { position: V3; scale?: number; speed?: number }) {
+  const g = useRef<THREE.Group>(null);
+  const x0 = position[0];
+  useFrame(({ clock }) => {
+    if (g.current) g.current.position.x = x0 + Math.sin(clock.elapsedTime * speed) * 3;
+  });
+  return (
+    <group ref={g} position={position}>
+      <Asset name="Cloud" scale={scale} fallback={<CloudProc position={[0, 0, 0]} scale={scale} speed={0} />} />
+    </group>
+  );
+}
+
+export function Bush({ position, scale = 1 }: { position: V3; scale?: number }) {
+  return <Asset name="Bush" position={position} scale={scale} rotation={[0, position[2], 0]} />;
 }

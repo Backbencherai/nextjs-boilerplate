@@ -141,7 +141,7 @@ function Scene({ ctl, onZone, onNotes, unreadNotes, night }: Props & { night: bo
     <>
       <SkyDome night={night} />
       <fog attach="fog" args={[night ? "#22242c" : "#f4f3ef", 38, 100]} />
-      <Ink wash={night ? 0.55 : 0.72} />
+      <Ink wash={night ? 0.4 : 0.48} />
       <hemisphereLight args={[night ? "#8a93c9" : "#ffffff", night ? "#1b1530" : "#d8d6ce", night ? 0.5 : 1.1]} />
       <directionalLight
         position={night ? [-20, 30, -10] : [18, 30, 12]}
@@ -183,7 +183,7 @@ function Scene({ ctl, onZone, onNotes, unreadNotes, night }: Props & { night: bo
       <Cloud position={[-8, -8, -30]} scale={3} speed={0.05} />
 
       {ISLANDS.map((i) => (
-        <Island key={i.id} position={[i.x, 0, i.z]} radius={i.r} grass={night ? "#4f7a52" : "#cfe0a8"} seed={i.id} onGround={ground} />
+        <Island key={i.id} position={[i.x, 0, i.z]} radius={i.r} grass={night ? "#4f7a52" : "#b5d68a"} seed={i.id} onGround={ground} />
       ))}
       {BRIDGES.map((b, i) => (
         <Bridge key={i} from={b.from} to={b.to} onGround={ground} />
@@ -473,7 +473,7 @@ function Player({
     }
     // camera follow
     const z = c.zoom;
-    tmpV.set(p.x, 8.5 * z + 0.5, p.z + 10.5 * z);
+    tmpV.set(p.x, 7.2 * z + 0.6, p.z + 11.5 * z);
     camera.position.lerp(tmpV, 1 - Math.exp(-dt * 4));
     camera.lookAt(p.x, 0.9, p.z);
 

@@ -1,6 +1,7 @@
 "use client";
 import { useFrame } from "@react-three/fiber";
-import { useRef, type MutableRefObject } from "react";
+import { Suspense, useRef, type MutableRefObject } from "react";
+import { AssetBoundary, nodePos, useAssetClone, useAssets } from "./assets";
 import type { Group } from "three";
 import type { PlayerId } from "@/lib/types";
 
@@ -15,18 +16,7 @@ const LOOKS: Record<PlayerId, { shirt: string; pants: string; hair: string; shoe
 };
 const SKIN = "#f1d3bd";
 
-export function Character({
-  player,
-  motion,
-  scale = 1,
-  onClick,
-}: {
-  player: PlayerId;
-  motion?: MutableRefObject<MotionRef>;
-  scale?: number;
-  onClick?: () => void;
-}) {
-  const L = LOOKS[player];
+function useRig(motion?: MutableRefObject<MotionRef>) {
   const root = useRef<Group>(null);
   const body = useRef<Group>(null);
   const legL = useRef<Group>(null);
@@ -70,6 +60,23 @@ export function Character({
       }
     }
   });
+
+  return { root, body, legL, legR, armL, armR, head, eyes };
+}
+
+function CharacterProc({
+  player,
+  motion,
+  scale = 1,
+  onClick,
+}: {
+  player: PlayerId;
+  motion?: MutableRefObject<MotionRef>;
+  scale?: number;
+  onClick?: () => void;
+}) {
+  const L = LOOKS[player];
+  const { root, body, legL, legR, armL, armR, head, eyes } = useRig(motion);
 
   return (
     <group
@@ -192,5 +199,73 @@ export function Character({
         <meshBasicMaterial color="#000" transparent opacity={0.22} depthWrite={false} />
       </mesh>
     </group>
+  );
+}
+
+type CharProps = { player: PlayerId; motion?: MutableRefObject<MotionRef>; scale?: number; onClick?: () => void };
+
+/** Blender-modelled character: smooth parts with origins at the joints, driven by the same rig. */
+function CharacterGLB({ player, motion, scale = 1, onClick }: CharProps) {
+  const P = player === "adarsh" ? "A" : "D";
+  const nodes = useAssets();
+  const { root, body, legL, legR, armL, armR, head, eyes } = useRig(motion);
+  const bodyO = useAssetClone(`${P}_Body`);
+  const headO = useAssetClone(`${P}_Head`);
+  const eyesO = useAssetClone(`${P}_Eyes`);
+  const armLO = useAssetClone(`${P}_ArmL`);
+  const armRO = useAssetClone(`${P}_ArmR`);
+  const legLO = useAssetClone(`${P}_LegL`);
+  const legRO = useAssetClone(`${P}_LegR`);
+  if (!bodyO || !headO || !eyesO || !armLO || !armRO || !legLO || !legRO) throw new Error("character parts missing");
+  const hp = nodePos(nodes, `${P}_Head`);
+  const ep = nodePos(nodes, `${P}_Eyes`);
+  return (
+    <group
+      scale={scale}
+      onClick={(e) => {
+        if (!onClick) return;
+        e.stopPropagation();
+        onClick();
+      }}
+    >
+      <group ref={root}>
+        <group ref={body}>
+          <group ref={legL} position={nodePos(nodes, `${P}_LegL`)}>
+            <primitive object={legLO} />
+          </group>
+          <group ref={legR} position={nodePos(nodes, `${P}_LegR`)}>
+            <primitive object={legRO} />
+          </group>
+          <primitive object={bodyO} />
+          <group ref={armL} position={nodePos(nodes, `${P}_ArmL`)}>
+            <primitive object={armLO} />
+          </group>
+          <group ref={armR} position={nodePos(nodes, `${P}_ArmR`)}>
+            <primitive object={armRO} />
+          </group>
+          <group ref={head} position={hp}>
+            <primitive object={headO} />
+            <group ref={eyes} position={[ep[0] - hp[0], ep[1] - hp[1], ep[2] - hp[2]]}>
+              <primitive object={eyesO} />
+            </group>
+          </group>
+        </group>
+      </group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+        <circleGeometry args={[0.35, 20]} />
+        <meshBasicMaterial color="#000" transparent opacity={0.14} depthWrite={false} />
+      </mesh>
+    </group>
+  );
+}
+
+export function Character(props: CharProps) {
+  const fb = <CharacterProc {...props} />;
+  return (
+    <AssetBoundary fallback={fb}>
+      <Suspense fallback={fb}>
+        <CharacterGLB {...props} />
+      </Suspense>
+    </AssetBoundary>
   );
 }

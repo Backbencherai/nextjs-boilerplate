@@ -3,6 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { seeded } from "@/lib/game/dates";
+import { Asset } from "./assets";
 
 /**
  * A crowd of tiny doodle "sprouts" that amble around inside a circle.
@@ -90,6 +91,7 @@ export function Crowd({
             a.hop = 1;
           }}
         >
+          <Asset name="Sprout" fallback={<group>
           <mesh position={[0, 0.28, 0]} castShadow>
             <capsuleGeometry args={[0.13, 0.22, 4, 10]} />
             <meshStandardMaterial color="#ffffff" />
@@ -106,6 +108,7 @@ export function Crowd({
             <sphereGeometry args={[0.018, 6, 6]} />
             <meshBasicMaterial color="#14140f" />
           </mesh>
+          </group>} />
           {a.hat && (
             <mesh position={[0, 0.7, 0]} userData={{ keep: true }}>
               <cylinderGeometry args={[0.08, 0.11, 0.07, 10]} />
