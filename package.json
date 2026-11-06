@@ -8,10 +8,14 @@
     "start": "next start"
   },
   "dependencies": {
+    "@fontsource/jetbrains-mono": "^5.2.5",
+    "@fontsource/luckiest-guy": "^5.2.5",
+    "@fontsource/nunito": "^5.2.6",
     "@react-three/drei": "^10.7.6",
     "@react-three/fiber": "^9.3.0",
     "@supabase/supabase-js": "^2.57.4",
     "framer-motion": "^12.38.0",
+    "mqtt": "^5.10.4",
     "next": "^15.5.29",
     "react": "19.1.0",
     "react-dom": "19.1.0",

@@ -21,9 +21,9 @@ export async function downloadCertificate(c: CertInput) {
   cv.height = H;
   const g = cv.getContext("2d")!;
   await document.fonts?.ready;
-  const display = getComputedStyle(document.body).getPropertyValue("--font-display").trim() || "serif";
-  const serif = getComputedStyle(document.body).getPropertyValue("--font-body").trim() || "serif";
-  const mono = getComputedStyle(document.body).getPropertyValue("--font-mono").trim() || "monospace";
+  const display = getComputedStyle(document.documentElement).getPropertyValue("--font-display").trim() || "serif";
+  const serif = getComputedStyle(document.documentElement).getPropertyValue("--font-body").trim() || "serif";
+  const mono = getComputedStyle(document.documentElement).getPropertyValue("--font-mono").trim() || "monospace";
 
   // paper
   const bg = g.createLinearGradient(0, 0, W, H);

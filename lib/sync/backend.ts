@@ -2,6 +2,7 @@
 import { createClient, type RealtimeChannel, type SupabaseClient } from "@supabase/supabase-js";
 import type { Activity, PlayerId } from "../types";
 import { syncConfigSync } from "./config";
+import { DEFAULT_RELAYS, RelayBackend } from "./relay";
 
 export interface WorldPos {
   player: PlayerId;
@@ -10,6 +11,7 @@ export interface WorldPos {
   ry: number;
   moving: boolean;
   zone?: string | null;
+  driving?: boolean;
   t: number;
 }
 
@@ -272,11 +274,19 @@ class LocalBackend implements Backend {
 }
 
 export function cloudConfigured() {
-  return Boolean(syncConfigSync());
+  const c = syncConfigSync();
+  return Boolean((c.supabaseUrl && c.supabaseAnonKey) || relayList().length);
+}
+
+function relayList() {
+  const c = syncConfigSync();
+  return Array.isArray(c.relays) ? c.relays.filter((r) => /^wss?:\/\//.test(r)) : DEFAULT_RELAYS;
 }
 
 export function makeBackend(space: string): Backend {
   const cfg = syncConfigSync();
-  if (cfg) return new CloudBackend(cfg.supabaseUrl, cfg.supabaseAnonKey, space);
+  if (cfg.supabaseUrl && cfg.supabaseAnonKey) return new CloudBackend(cfg.supabaseUrl, cfg.supabaseAnonKey, space);
+  const relays = relayList();
+  if (relays.length && typeof crypto !== "undefined" && crypto.subtle) return new RelayBackend(space, relays);
   return new LocalBackend(space);
 }

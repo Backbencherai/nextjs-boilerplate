@@ -363,7 +363,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const setIdentity = useStore((s) => s.setIdentity);
   const [step, setStep] = useState(0);
   const [who, setWho] = useState<PlayerId | null>(null);
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState("LOVE");
   const [busy, setBusy] = useState(false);
   const cloud = cloudConfigured();
 
@@ -421,26 +421,28 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             }
           >
             <p className="story-count">2 of 3</p>
-            <h2 className="display story-title">A secret word</h2>
+            <h2 className="display story-title">Join code</h2>
             <p className="story-body">
-              You both type the <b>same word</b> on your own phones. It&apos;s the key to your shared universe. Nobody without it can see anything.
+              You both enter the <b>same join code</b> on your own phones, anywhere in the world, and you&apos;re in one live multiplayer universe. Everything is encrypted with it.
             </p>
             <input
-              className="input big"
-              type="password"
+              className="input big join-code"
+              type="text"
               autoComplete="off"
-              placeholder="something only you two know"
+              autoCapitalize="characters"
+              spellCheck={false}
+              placeholder="LOVE"
               value={code}
-              onChange={(e) => setCode(e.target.value)}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
               onKeyDown={(e) => e.key === "Enter" && finish()}
             />
-            <p className="small muted center">{cloud ? "☁️ Live sync is on: you'll see each other in real time." : "📱 Local mode: data stays on this device until Supabase keys are added (see README)."}</p>
+            <p className="small muted center">{cloud ? "💞 Multiplayer is on. You'll see each other walk, cheer and level up live." : "📱 This browser can't do multiplayer. Your progress stays on this device."}</p>
             <div className="row gap center">
               <button className="btn btn-ghost" onClick={() => setStep(0)}>
                 Back
               </button>
               <button className="btn btn-primary" disabled={code.trim().length < 4 || busy} onClick={finish}>
-                {busy ? "Opening…" : "Open it"}
+                {busy ? "Joining…" : "Join"}
               </button>
             </div>
           </Card>

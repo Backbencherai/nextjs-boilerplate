@@ -119,9 +119,15 @@ export const useStore = create<State>((set, get) => {
     if (space) writeCache(space, list);
     if (!celebrateNew || !me) return;
 
+    // Only celebrate things that just happened — not history arriving on a new device.
+    const RECENT = 10 * 60_000;
+    const recent = (iso?: string) => !!iso && Date.now() - new Date(iso).getTime() < RECENT;
+    const prevIds = new Set(prev.activities.map((a) => a.id));
+    const freshChange = list.some((a) => !prevIds.has(a.id) && recent(a.at));
+    if (!freshChange) return;
     for (const who of ["adarsh", "devanshi", "together"] as const) {
-      u.unlocks[who].forEach((_at, id) => {
-        if (prev.unlocks[who].has(id)) return;
+      u.unlocks[who].forEach((at, id) => {
+        if (prev.unlocks[who].has(id) || !recent(at)) return;
         const def = ACH_BY_ID.get(id);
         if (!def) return;
         if (who === me || who === "together") {

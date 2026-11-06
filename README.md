@@ -14,19 +14,22 @@ A private, explorable 3D world where Adarsh and Dewanshi level up in real life.
 
 The build is fully static (`output: "export"`), so it runs on any static host.
 
-## Live sync between both phones (free Supabase)
-1. Create a free project at https://supabase.com, then open SQL Editor → New query, paste `supabase/schema.sql` and click Run.
-2. Copy the Project URL and the anon public key from Project Settings → API.
-3. Put them in `sync-config.json` (it sits at the top of the uploaded folder, or in `public/` in the source):
-   ```json
-   { "supabaseUrl": "https://xxxx.supabase.co", "supabaseAnonKey": "eyJ..." }
-   ```
-   Re-upload. Alternatively, set the `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` environment variables before building.
-4. On both phones, enter the **same secret word** during onboarding.
+## Multiplayer: works anywhere, no setup
+Both players open the site, pick who they are and enter the same **join code** (pre-filled: `LOVE`). That's it: you're in one live universe from anywhere in the world.
 
-Without Supabase the app runs in **local mode**: data stays in that browser and syncs live between tabs on the same device.
+- **Live:** you see each other walk around the world (and drive). Logs, cheers, bottle notes, medals and builds show up on the other phone within seconds. There's an online indicator ("● both online").
+- **History:** every activity is kept on the relay. A phone that was offline, or a brand-new phone, catches up when it joins with the code. Each phone also keeps its own copy and re-shares it, so nothing is lost.
+- **Private:** everything is encrypted (AES-GCM) with a key derived from your join code. The relays only see scrambled data under a random-looking topic.
+- **How:** two free public MQTT-over-WebSocket relays (EMQX and HiveMQ) are used at once, so if one is down the other carries on. The relay list is in `sync-config.json`; the code is in `lib/sync/relay.ts`.
 
-Privacy: rows are scoped to a SHA-256 hash of your secret word, which is sent as an `x-space-key` header and enforced by Row Level Security. The anon key is designed to be public.
+**Optional: your own Supabase.** For a database you control, run `supabase/schema.sql` in a free Supabase project. Then put `supabaseUrl` and `supabaseAnonKey` in `sync-config.json`. When those are set, the app uses Supabase instead of the relays.
+
+## Install it like an app
+Open the site on your phone:
+- **Android / Chrome:** tap the "Install the app" card on Home, or use Chrome's menu and choose Install.
+- **iPhone / Safari:** tap Share, then Add to Home Screen.
+
+It opens full-screen with its own icon, and works offline (the service worker is `public/sw.js`).
 
 ## Island projects (the game loop)
 Bridges start missing and appear plank by plank as you make real progress:

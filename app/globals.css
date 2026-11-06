@@ -6,6 +6,10 @@
    Colour is rare: blue = Adarsh, red = Devanshi, yellow = rewards.
    ───────────────────────────────────────────────────────────── */
 :root {
+  /* fonts are bundled (no runtime/build-time Google dependency) */
+  --font-display: "Luckiest Guy";
+  --font-body: "Nunito";
+  --font-mono: "JetBrains Mono";
   --paper: #f4f3ef;
   --paper-2: #fbfaf6;
   --paper-3: #ebe9e2;
@@ -643,11 +647,19 @@ a {
 .home-head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+}
+.home-head > .grow {
+  order: 3;
+  flex-basis: 100%;
+}
+.home-head > .sync-badge {
+  margin-left: auto;
 }
 .home-name {
-  font-size: clamp(40px, 11.5vw, 84px);
-  overflow-wrap: anywhere;
+  font-size: clamp(44px, 15vw, 96px);
+  white-space: nowrap;
   margin: 0;
   transform: rotate(-2deg);
   transform-origin: left;
@@ -2069,4 +2081,15 @@ a {
   z-index: 12;
   right: 16px;
   bottom: calc(120px + var(--safe-b));
+}
+
+.join-code {
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 34px !important;
+  letter-spacing: 0.3em;
+  padding-top: 16px;
+}
+.install-card {
+  background: var(--yellow-soft);
 }

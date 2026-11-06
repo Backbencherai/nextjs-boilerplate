@@ -36,6 +36,19 @@ export function Shell({ children }: { children: ReactNode }) {
     hydrate();
   }, [hydrate]);
 
+  // installable app: register the service worker (production only)
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    const onPrompt = (e: Event) => {
+      e.preventDefault();
+      (window as unknown as { __axdInstall?: Event }).__axdInstall = e;
+      window.dispatchEvent(new Event("axd-installable"));
+    };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
+  }, []);
+
   // Konami code → developer console
   useEffect(() => {
     const seq = ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright", "b", "a"];

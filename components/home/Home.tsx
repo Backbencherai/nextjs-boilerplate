@@ -12,6 +12,7 @@ import { SECRETS } from "@/lib/game/secrets";
 import { QuestRow } from "../QuestList";
 import { Logo } from "../Logo";
 import { BuildCard } from "../BuildCard";
+import { InstallCard } from "../InstallCard";
 
 export function Home() {
   const me = useStore((s) => s.me) as PlayerId;
@@ -61,7 +62,7 @@ export function Home() {
           <h1 className="display home-name">{meta.name}.</h1>
         </div>
         <div className={`sync-badge ${mode}`} title={mode === "cloud" ? "Live sync on" : "This device only"}>
-          {mode === "cloud" ? "● live" : "◌ local"}
+          {mode === "cloud" ? (online.includes(partner) ? "● both online" : "● live") : "◌ local"}
         </div>
       </header>
 
@@ -128,6 +129,7 @@ export function Home() {
         </div>
       </section>
 
+      <InstallCard />
       <BuildCard limit={2} />
 
       <section className="card partner" style={{ ["--c" as string]: PLAYER_META[partner].color }}>
@@ -301,14 +303,14 @@ function Settings() {
           <button
             className="btn btn-ghost danger"
             onClick={() => {
-              if (!confirm("Leave this universe on this device? Your data stays in the cloud (or in this browser in local mode) and comes back when you enter the same secret word.")) return;
+              if (!confirm("Leave this universe on this device? Your shared progress stays with your partner and comes back when you join with the same code again.")) return;
               try {
                 localStorage.removeItem("adxd:prefs");
               } catch {}
               location.href = "/";
             }}
           >
-            Change secret word / sign out
+            Change join code / sign out
           </button>
         </div>
       )}

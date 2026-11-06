@@ -541,7 +541,7 @@ function Player({
     // coins
     for (const cn of coinsRef.current) if (Math.hypot(cn.x - p.x, cn.z - p.z) < 0.9) onCoin(cn.idx);
 
-    sendPos({ x: p.x, z: p.z, ry: yaw.current, moving: mag > 0.05, zone: best });
+    sendPos({ x: p.x, z: p.z, ry: yaw.current, moving: mag > 0.05, zone: best, driving: c.driving });
   });
 
   return (
@@ -633,7 +633,10 @@ function Partner() {
 
   return (
     <group ref={g}>
-      <Character player={who} motion={motion} onClick={cheer} />
+      <group position={[0, pp?.driving && online ? 0.32 : 0, 0]}>
+        <Character player={who} motion={motion} onClick={cheer} sitting={!!(pp?.driving && online)} />
+      </group>
+      {pp?.driving && online && <Asset name="Car" />}
       <group ref={hearts} visible={false}>
         {[-0.3, 0, 0.3].map((x, i) => (
           <mesh key={i} position={[x, i * 0.15, 0]}>
