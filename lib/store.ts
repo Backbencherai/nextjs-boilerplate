@@ -6,6 +6,7 @@ import { computeUniverse, type Universe } from "./game/stats";
 import { ACH_BY_ID } from "./game/achievements";
 import { makeBackend, readCache, writeCache, type Backend, type WorldPos } from "./sync/backend";
 import { loadSyncConfig } from "./sync/config";
+import { buildStates } from "./game/builds";
 import { SECRETS } from "./game/secrets";
 
 export type TimerKind = "study" | "workout" | "meditation";
@@ -19,7 +20,7 @@ export interface Timer {
 
 export interface Celebration {
   id: string;
-  kind: "achievement" | "level" | "quest" | "secret";
+  kind: "achievement" | "level" | "quest" | "secret" | "build";
   title: string;
   subtitle: string;
   who: PlayerId | "together";
@@ -128,6 +129,16 @@ export const useStore = create<State>((set, get) => {
         } else {
           get().toast({ icon: def.icon, text: `${PLAYER_META[who].name} unlocked ${def.name}`, color: PLAYER_META[who].color });
         }
+      });
+    }
+    const before = new Set(buildStates(prev).filter((b) => b.done).map((b) => b.def.id));
+    for (const b of buildStates(u)) {
+      if (!b.done || before.has(b.def.id)) continue;
+      get().celebrate({
+        kind: "build",
+        title: b.def.name,
+        subtitle: b.def.kind === "bridge" ? "Bridge complete! A new island is open — go explore." : b.def.kind === "vehicle" ? "Your car is parked on Together Isle. Hop in!" : "Built on your islands. Go and see it in the world.",
+        who: b.def.owner ?? "together",
       });
     }
     const pm = prev.players[me].level;

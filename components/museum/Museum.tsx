@@ -133,7 +133,7 @@ function MuseumScene({ who, list, focus, setFocus }: { who: Who; list: typeof AC
       <Ink wash={0.55} />
       <ambientLight intensity={0.5} />
       <hemisphereLight args={["#ffffff", "#d8d6ce", 0.9]} />
-      <spotLight position={[0, 9, 0]} angle={0.7} penumbra={0.8} intensity={50} color="#ffffff" castShadow />
+      <spotLight position={[0, 9, 0]} angle={0.7} penumbra={0.8} intensity={50} color="#ffffff" castShadow shadow-bias={-0.0004} shadow-normalBias={0.04} />
       <Environment resolution={128}>
         <Lightformer intensity={2.5} position={[0, 5, 0]} rotation-x={Math.PI / 2} scale={[10, 10, 1]} color="#fff1dd" />
         <Lightformer intensity={1.5} position={[-6, 2, 0]} rotation-y={Math.PI / 2} scale={[6, 3, 1]} color="#ff9d5c" />

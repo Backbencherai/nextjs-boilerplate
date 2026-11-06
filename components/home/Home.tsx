@@ -11,6 +11,7 @@ import { questBoard } from "@/lib/game/quests";
 import { SECRETS } from "@/lib/game/secrets";
 import { QuestRow } from "../QuestList";
 import { Logo } from "../Logo";
+import { BuildCard } from "../BuildCard";
 
 export function Home() {
   const me = useStore((s) => s.me) as PlayerId;
@@ -126,6 +127,8 @@ export function Home() {
           ))}
         </div>
       </section>
+
+      <BuildCard limit={2} />
 
       <section className="card partner" style={{ ["--c" as string]: PLAYER_META[partner].color }}>
         <div className="card-head">

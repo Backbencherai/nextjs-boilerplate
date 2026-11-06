@@ -2,7 +2,7 @@
 import { TIER_COLORS, type Tier } from "./game/achievements";
 
 export interface CertInput {
-  recipient: string; // "Adarsh", "Devanshi" or "Adarsh & Devanshi"
+  recipient: string; // "Adarsh", "Dewanshi" or "Adarsh & Dewanshi"
   title: string; // achievement name
   description: string;
   date: string; // formatted date

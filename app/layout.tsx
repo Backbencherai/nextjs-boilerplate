@@ -9,7 +9,7 @@ const mono = JetBrains_Mono({ variable: "--font-mono", subsets: ["latin"], weigh
 
 export const metadata: Metadata = {
   title: "A×D — Our Growth Universe",
-  description: "A private, explorable 3D world where Adarsh and Devanshi level up in real life — together.",
+  description: "A private, explorable 3D world where Adarsh and Dewanshi level up in real life — together.",
   robots: { index: false, follow: false },
   appleWebApp: { capable: true, title: "A×D", statusBarStyle: "black-translucent" },
 };

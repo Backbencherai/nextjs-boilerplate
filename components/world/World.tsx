@@ -10,6 +10,7 @@ import { Crowd } from "../three/Crowd";
 import {
   Bonfire,
   Bottle,
+  Fireworks,
   Bridge,
   Cloud,
   Coin,
@@ -31,7 +32,9 @@ import {
   StrengthCairn,
   Tree,
 } from "../three/props";
-import { BRIDGES, COIN_SPOTS, ISLANDS, SPAWN, ZONES, walkable } from "./layout";
+import { BRIDGES, CAR_SPOT, COIN_SPOTS, FOUNTAIN_SPOT, ISLANDS, SPAWN, ZONES, walkable, type Openings } from "./layout";
+import { BUILDS, bridgeProgress, builtSet, houseTier } from "@/lib/game/builds";
+import { Asset } from "../three/assets";
 import { useStore } from "@/lib/store";
 import { PLAYER_META, partnerOf, KIND_META, type PlayerId } from "@/lib/types";
 import { dayKey, fmtMinutes, seeded, timeAgo } from "@/lib/game/dates";
@@ -42,9 +45,11 @@ export interface Ctl {
   target: [number, number] | null;
   teleport: [number, number] | null;
   zoom: number;
+  driving: boolean;
 }
 
 interface Props {
+  driving: boolean;
   ctl: MutableRefObject<Ctl>;
   onZone: (id: string | null) => void;
   onNotes: () => void;
@@ -99,7 +104,7 @@ function SkyDome({ night }: { night: boolean }) {
   );
 }
 
-function Scene({ ctl, onZone, onNotes, unreadNotes, night }: Props & { night: boolean }) {
+function Scene({ ctl, onZone, onNotes, unreadNotes, night, driving }: Props & { night: boolean }) {
   const me = useStore((s) => s.me) as PlayerId;
   const u = useStore((s) => s.universe);
   const activities = useStore((s) => s.activities);
@@ -135,6 +140,9 @@ function Scene({ ctl, onZone, onNotes, unreadNotes, night }: Props & { night: bo
   };
 
   const sharedLevel = u.players.adarsh.level + u.players.devanshi.level;
+  const bp = useMemo(() => bridgeProgress(u), [u]);
+  const built = useMemo(() => builtSet(u), [u]);
+  const open = useMemo<Openings>(() => ({ bridges: bp.map((x) => x >= 1), fountain: built.has("fountain") }), [bp, built]);
   const sharedMedals = u.unlocks.together.size;
 
   return (
@@ -155,6 +163,7 @@ function Scene({ ctl, onZone, onNotes, unreadNotes, night }: Props & { night: bo
         shadow-camera-bottom={-28}
         shadow-camera-far={90}
         shadow-bias={-0.0006}
+        shadow-normalBias={0.05}
       />
       {night && <Stars radius={120} depth={40} count={2500} factor={4} fade speed={0.6} />}
 
@@ -185,9 +194,28 @@ function Scene({ ctl, onZone, onNotes, unreadNotes, night }: Props & { night: bo
       {ISLANDS.map((i) => (
         <Island key={i.id} position={[i.x, 0, i.z]} radius={i.r} grass={night ? "#4f7a52" : "#b5d68a"} seed={i.id} onGround={ground} />
       ))}
-      {BRIDGES.map((b, i) => (
-        <Bridge key={i} from={b.from} to={b.to} onGround={ground} />
-      ))}
+      {BRIDGES.map((b, i) => {
+        const def = BUILDS.find((d) => d.bridge === i)!;
+        return (
+          <group key={i}>
+            <Bridge from={b.from} to={b.to} onGround={ground} progress={bp[i]} />
+            {bp[i] < 1 && (
+              <Html position={[(b.from[0] + b.to[0]) / 2, 1.2, (b.from[1] + b.to[1]) / 2]} center distanceFactor={13} zIndexRange={[15, 0]} style={{ pointerEvents: "none" }}>
+                <div className="build-tag">
+                  <b>🔨 {def.name}</b>
+                  <i>
+                    <i style={{ width: `${Math.round(bp[i] * 100)}%` }} />
+                  </i>
+                  <span>{def.how}</span>
+                </div>
+              </Html>
+            )}
+          </group>
+        );
+      })}
+      {built.has("fountain") && <Asset name="Fountain" position={[FOUNTAIN_SPOT[0], 0, FOUNTAIN_SPOT[1]]} />}
+      {built.has("car") && !ctl.current.driving && <Asset name="Car" position={[CAR_SPOT[0], 0, CAR_SPOT[1]]} rotation={[0, -Math.PI / 2, 0]} onClick={zoneClick("garage")} />}
+      {built.has("fireworks") && <Fireworks />}
 
       {/* ——— Together Isle (shared growth) ——— */}
       <HallOfFame position={[-4, 0, -4.4]} glow={sharedMedals} onClick={zoneClick("hall")} />
@@ -212,14 +240,14 @@ function Scene({ ctl, onZone, onNotes, unreadNotes, night }: Props & { night: bo
           }}
         />
       </group>
-      {[[-6, 0, 3], [6.5, 0, 1.5], [-2, 0, -6.8], [-6.6, 0, -1], [1.2, 0, 6.8]].map((p, i) => (
+      {[[-6, 0, 3], [-2, 0, -6.8], [-6.6, 0, -1], [1.2, 0, 6.8]].map((p, i) => (
         <Lamp key={i} position={p as [number, number, number]} on={night} />
       ))}
       {[[-1.5, 0.05, 6], [6.6, 0.05, -2.6], [-6.8, 0.05, 1], [2.5, 0.05, -7]].map((p, i) => (
         <Rock key={i} position={p as [number, number, number]} />
       ))}
       <Sparkles count={20 + sharedMedals * 12} scale={[14, 3, 14]} position={[0, 1.5, 0]} size={3} speed={0.3} color={night ? "#f8e08a" : "#f2c31a"} />
-      <Crowd count={10} radius={2.6} center={[-1.2, 1.2]} seed="together-crowd" />
+      <Crowd count={9} radius={1.7} center={[0.2, 4.7]} seed="together-crowd" />
       <Crowd count={7} radius={2.4} center={[0, 13.6]} seed="body-crowd" />
       <Crowd count={6} radius={2.2} center={[-0.6, -13.8]} seed="mind-crowd" />
 
@@ -261,7 +289,7 @@ function Scene({ ctl, onZone, onNotes, unreadNotes, night }: Props & { night: bo
           <Coin key={c.idx} position={[c.x, 0, c.z]} />
         ))}
 
-      <Player ctl={ctl} onZone={onZone} coins={coins.filter((c) => !collected.has(c.idx))} onCoin={onCoin} />
+      <Player ctl={ctl} onZone={onZone} coins={coins.filter((c) => !collected.has(c.idx))} onCoin={onCoin} open={open} carBuilt={built.has("car")} driving={driving} />
       <Partner />
     </>
   );
@@ -322,7 +350,7 @@ function PersonalIsle({ player, onHome }: { player: PlayerId; onHome: (e: ThreeE
 
   return (
     <group>
-      <House position={[isle.x, 0, isle.z - 2.2]} wall={player === "adarsh" ? "#dfeefa" : "#fde6ee"} roof={meta.accent} onClick={onHome} />
+      <House position={[isle.x, 0, isle.z - 2.2]} wall={player === "adarsh" ? "#dfeefa" : "#fde6ee"} roof={meta.accent} onClick={onHome} tier={houseTier(u, player)} />
       {spots.slice(0, trees).map((s, i) => (
         <Tree key={i} position={[s.x, 0, s.z]} scale={s.s} variant={s.v} color={player === "adarsh" ? "#4fae6a" : "#79b84a"} />
       ))}
@@ -341,7 +369,7 @@ function PersonalIsle({ player, onHome }: { player: PlayerId; onHome: (e: ThreeE
           </mesh>
         );
       })}
-      <Html position={[isle.x + 1.4, 1.6, isle.z + 0.45]} center distanceFactor={12} style={{ pointerEvents: "none" }}>
+      <Html position={[isle.x + 1.4, 1.6, isle.z + 0.45]} center distanceFactor={12} zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
         <div className="isle-sign" style={{ borderColor: meta.color }}>
           <b>{meta.name}</b>
           <span>
@@ -360,12 +388,21 @@ function Player({
   onZone,
   coins,
   onCoin,
+  open,
+  carBuilt,
+  driving,
 }: {
   ctl: MutableRefObject<Ctl>;
   onZone: (id: string | null) => void;
   coins: { idx: number; x: number; z: number }[];
   onCoin: (idx: number) => void;
+  open: Openings;
+  carBuilt: boolean;
+  driving: boolean;
 }) {
+  const openRef = useRef(open);
+  openRef.current = open;
+  const carRef = useRef<THREE.Group>(null);
   const me = useStore((s) => s.me) as PlayerId;
   const sendPos = useStore((s) => s.sendPos);
   const findSecret = useStore((s) => s.findSecret);
@@ -438,20 +475,20 @@ function Player({
     const mag = Math.min(1, Math.hypot(dx, dz));
     if (mag > 0.01) {
       const n = Math.hypot(dx, dz);
-      const speed = 5.2 * mag;
+      const speed = (c.driving ? 9.5 : 5.2) * mag;
       const sx = (dx / n) * speed * dt;
       const sz = (dz / n) * speed * dt;
-      if (walkable(p.x + sx, p.z + sz)) {
+      if (walkable(p.x + sx, p.z + sz, openRef.current)) {
         p.x += sx;
         p.z += sz;
-      } else if (walkable(p.x + sx, p.z)) p.x += sx;
-      else if (walkable(p.x, p.z + sz)) p.z += sz;
+      } else if (walkable(p.x + sx, p.z, openRef.current)) p.x += sx;
+      else if (walkable(p.x, p.z + sz, openRef.current)) p.z += sz;
       else {
         // slide around round obstacles: try rotating the step ±60°
         for (const ang of [1.05, -1.05]) {
           const rx = sx * Math.cos(ang) - sz * Math.sin(ang);
           const rz = sx * Math.sin(ang) + sz * Math.cos(ang);
-          if (walkable(p.x + rx, p.z + rz)) {
+          if (walkable(p.x + rx, p.z + rz, openRef.current)) {
             p.x += rx;
             p.z += rz;
             break;
@@ -471,6 +508,10 @@ function Player({
       g.current.position.copy(p);
       g.current.rotation.y = yaw.current;
     }
+    if (carRef.current) {
+      carRef.current.visible = c.driving;
+      carRef.current.rotation.z = Math.sin(performance.now() / 90) * 0.012 * motion.current.speed;
+    }
     // camera follow
     const z = c.zoom;
     tmpV.set(p.x, 7.2 * z + 0.6, p.z + 11.5 * z);
@@ -486,6 +527,7 @@ function Player({
     let best: string | null = null;
     let bestD = 2.1;
     for (const zz of ZONES) {
+      if (zz.id === "garage" && (!carBuilt || c.driving)) continue;
       const d = Math.hypot(zz.door[0] - p.x, zz.door[1] - p.z);
       if (d < bestD) {
         bestD = d;
@@ -505,7 +547,12 @@ function Player({
   return (
     <>
       <group ref={g}>
-        <Character player={me} motion={motion} onClick={() => (motion.current.emote = 1.2)} />
+        <group position={[0, driving ? 0.32 : 0, driving ? 0.05 : 0]}>
+          <Character player={me} motion={motion} sitting={driving} onClick={() => (motion.current.emote = 1.2)} />
+        </group>
+        <group ref={carRef} visible={false}>
+          {carBuilt && <Asset name="Car" position={[0, 0, 0]} />}
+        </group>
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
           <ringGeometry args={[0.45, 0.55, 32]} />
           <meshBasicMaterial color={PLAYER_META[me].color} transparent opacity={0.8} />

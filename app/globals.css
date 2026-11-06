@@ -52,16 +52,6 @@ body {
 body {
   -webkit-font-smoothing: antialiased;
 }
-/* faint pencil-paper texture on every page */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.5;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.08  0 0 0 0 0.08  0 0 0 0 0.06  0 0 0 .07 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-}
 main,
 .page {
   position: relative;
@@ -2005,4 +1995,78 @@ a {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+/* ───────────── Island projects ───────────── */
+.build-tag {
+  white-space: nowrap;
+  background: var(--paper-2);
+  border: 2px solid var(--ink);
+  box-shadow: 2px 3px 0 var(--ink);
+  border-radius: 12px;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  min-width: 150px;
+}
+.build-tag b {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+.build-tag > i {
+  display: block;
+  height: 9px;
+  border: 1.5px solid var(--ink);
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--paper);
+}
+.build-tag > i > i {
+  display: block;
+  height: 100%;
+  background: var(--yellow);
+}
+.builds {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.build {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 2px solid var(--ink);
+  border-radius: var(--wobble-sm);
+  padding: 10px 12px;
+  background: var(--paper);
+}
+.build.done {
+  background: #d9f2df;
+}
+.build b {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  font-size: 15px;
+  padding-top: 2px;
+}
+.build small {
+  display: block;
+  color: var(--ink-2);
+  margin: 2px 0 6px;
+}
+.build-icon {
+  font-size: 26px;
+}
+.hop-out {
+  position: absolute;
+  z-index: 12;
+  right: 16px;
+  bottom: calc(120px + var(--safe-b));
 }

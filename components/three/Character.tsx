@@ -1,6 +1,9 @@
 "use client";
 import { useFrame } from "@react-three/fiber";
-import { Suspense, useRef, type MutableRefObject } from "react";
+import { Suspense, useEffect, useMemo, useRef, type MutableRefObject } from "react";
+import * as THREE from "three";
+import { useAnimations, useGLTF } from "@react-three/drei";
+import { clone as skeletonClone } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { AssetBoundary, nodePos, useAssetClone, useAssets } from "./assets";
 import type { Group } from "three";
 import type { PlayerId } from "@/lib/types";
@@ -259,12 +262,105 @@ function CharacterGLB({ player, motion, scale = 1, onClick }: CharProps) {
   );
 }
 
-export function Character(props: CharProps) {
+const PEOPLE: Record<PlayerId, string> = { adarsh: "/models/adarsh.glb", devanshi: "/models/dewanshi.glb" };
+if (typeof window !== "undefined") {
+  useGLTF.preload(PEOPLE.adarsh, false);
+  useGLTF.preload(PEOPLE.devanshi, false);
+}
+const TARGET_HEIGHT = 1.62;
+
+/**
+ * Adarsh & Dewanshi — rigged, animated characters (based on KayKit's CC0 Adventurers,
+ * re-dressed in Blender). Animation follows the same MotionRef the world already drives:
+ * speed → idle / walk / run, emote → cheer, sitting → sit.
+ */
+function CharacterRigged({ player, motion, scale = 1, onClick, sitting = false }: CharProps & { sitting?: boolean }) {
+  const { scene, animations } = useGLTF(PEOPLE[player], false);
+  const holder = useRef<THREE.Group>(null);
+  const model = useMemo(() => {
+    const c = skeletonClone(scene) as THREE.Group;
+    c.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (o.name === "Icosphere") o.visible = false;
+      if (m.isMesh) {
+        m.castShadow = true;
+        m.frustumCulled = false;
+      }
+    });
+    c.userData.keep = true;
+    const box = new THREE.Box3().setFromObject(c);
+    const h = Math.max(0.1, box.max.y - box.min.y);
+    c.scale.setScalar(TARGET_HEIGHT / h);
+    c.position.y = -box.min.y * (TARGET_HEIGHT / h);
+    return c;
+  }, [scene]);
+  const { actions } = useAnimations(animations, holder);
+  const current = useRef<string>("");
+  const cheerLeft = useRef(0);
+
+  const play = (name: string, fade = 0.22) => {
+    if (current.current === name) return;
+    const next = actions[name];
+    if (!next) return;
+    const prev = current.current ? actions[current.current] : null;
+    next.reset().setEffectiveWeight(1).fadeIn(fade).play();
+    if (name === "Cheer" || name === "Jump_Full_Short") {
+      next.setLoop(THREE.LoopOnce, 1);
+      next.clampWhenFinished = true;
+    }
+    prev?.fadeOut(fade);
+    current.current = name;
+  };
+
+  useEffect(() => {
+    play(sitting ? "Sit_Floor_Idle" : "Idle", 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actions]);
+
+  useFrame((_, dt) => {
+    const m = motion?.current ?? { speed: 0, emote: 0 };
+    if (m.emote > 0 && cheerLeft.current <= 0) {
+      cheerLeft.current = 1.6;
+      m.emote = 0;
+      play("Cheer", 0.12);
+    }
+    if (cheerLeft.current > 0) {
+      cheerLeft.current -= dt;
+      if (m.speed < 0.08) return;
+      cheerLeft.current = 0;
+    }
+    if (sitting) play("Sit_Floor_Idle");
+    else if (m.speed > 0.72) play("Running_A", 0.18);
+    else if (m.speed > 0.08) play("Walking_A", 0.18);
+    else play("Idle", 0.3);
+  });
+
+  return (
+    <group
+      scale={scale}
+      onClick={(e) => {
+        if (!onClick) return;
+        e.stopPropagation();
+        onClick();
+      }}
+    >
+      <group ref={holder}>
+        <primitive object={model} />
+      </group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+        <circleGeometry args={[0.36, 24]} />
+        <meshBasicMaterial color="#000" transparent opacity={0.12} depthWrite={false} />
+      </mesh>
+    </group>
+  );
+}
+
+export function Character(props: CharProps & { sitting?: boolean }) {
   const fb = <CharacterProc {...props} />;
   return (
     <AssetBoundary fallback={fb}>
       <Suspense fallback={fb}>
-        <CharacterGLB {...props} />
+        <CharacterRigged {...props} />
       </Suspense>
     </AssetBoundary>
   );

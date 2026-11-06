@@ -20,7 +20,7 @@ function PaperLights() {
     <>
       <color attach="background" args={["#f4f3ef"]} />
       <hemisphereLight args={["#ffffff", "#d8d6ce", 1.15]} />
-      <directionalLight position={[5, 10, 6]} intensity={1.8} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
+      <directionalLight position={[5, 10, 6]} intensity={1.8} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} shadow-bias={-0.0004} shadow-normalBias={0.04} />
       <Ink />
     </>
   );
@@ -30,7 +30,7 @@ function ShadowFloor({ size = 60 }: { size?: number }) {
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
       <planeGeometry args={[size, size]} />
-      <shadowMaterial opacity={0.13} />
+      <shadowMaterial opacity={0.08} />
     </mesh>
   );
 }
@@ -180,7 +180,7 @@ export function Landing({ onStart, onStory, returning }: { onStart: () => void; 
         </h1>
         <p className="landing-names display">
           <span style={{ color: PLAYER_META.adarsh.color }}>Adarsh</span> <span className="x">×</span>{" "}
-          <span style={{ color: PLAYER_META.devanshi.color }}>Devanshi</span>
+          <span style={{ color: PLAYER_META.devanshi.color }}>Dewanshi</span>
         </p>
         <p className="landing-sub">Two people, one tiny universe. Every hour you study, train, eat well and rest makes your world grow.</p>
         <div className="row gap center">
@@ -200,7 +200,7 @@ export function Landing({ onStart, onStory, returning }: { onStart: () => void; 
 /* ───────────────────────── Story (illustrated cards) ───────────────────────── */
 
 const CHAPTERS = [
-  { title: "Two people", body: "Adarsh and Devanshi. Two lives, two schedules, two separate little worlds floating side by side." },
+  { title: "Two people", body: "Adarsh and Dewanshi. Two lives, two schedules, two separate little worlds floating side by side." },
   { title: "Real life counts", body: "Every study session, workout, healthy meal, glass of water and good night of sleep earns real XP." },
   { title: "Your island grows", body: "Hours become trees, books, crystals and weight plates. Streaks become flowers. You can walk around all of it." },
   { title: "Quests & medals", body: "Daily and weekly quests, 37 medals, certificates you can download, and a 3D museum for each of you." },

@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { useStore } from "@/lib/store";
 import { questBoard } from "@/lib/game/quests";
 import { QuestRow } from "./QuestList";
+import { BuildCard } from "./BuildCard";
 import type { PlayerId } from "@/lib/types";
 
 function untilMidnight() {
@@ -51,6 +52,7 @@ export function Quests() {
           ))}
         </div>
       </section>
+      <BuildCard limit={20} />
       <section className="card corkboard together">
         <div className="card-head">
           <h3>Together this week</h3>

@@ -14,7 +14,7 @@ export const ISLANDS: IslandDef[] = [
   { id: "mind", name: "Mind Isle", x: 0, z: -17, r: 5.5, grass: "#9ccf6b" },
   { id: "body", name: "Body Isle", x: 0, z: 17, r: 5.5, grass: "#7fc25a" },
   { id: "adarsh", name: "Adarsh's Isle", x: -17, z: 0, r: 6, grass: "#80c7a0" },
-  { id: "devanshi", name: "Devanshi's Isle", x: 17, z: 0, r: 6, grass: "#a8d36a" },
+  { id: "devanshi", name: "Dewanshi's Isle", x: 17, z: 0, r: 6, grass: "#a8d36a" },
 ];
 
 export const BRIDGES: { from: [number, number]; to: [number, number]; box: [number, number, number, number] }[] = [
@@ -44,7 +44,8 @@ export type ZoneAction =
   | { type: "sheet"; tab: "meal" | "water" | "sleep" | "mood" | "steps" }
   | { type: "water" }
   | { type: "route"; href: string }
-  | { type: "notes" };
+  | { type: "notes" }
+  | { type: "drive" };
 
 export interface ZoneDef {
   id: string;
@@ -69,8 +70,9 @@ export const ZONES: ZoneDef[] = [
   { id: "board", name: "Quest Board", icon: "📜", blurb: "Daily & weekly quests.", door: [-3.8, 4.7], label: [-3.8, 2.4, 3.6], action: { type: "route", href: "/quests" }, cta: "Read quests" },
   { id: "observatory", name: "Observatory", icon: "🔭", blurb: "See your growth charted across time.", door: [4, 5.6], label: [4, 3.2, 3.8], action: { type: "route", href: "/stats" }, cta: "Look at the stars" },
   { id: "dock", name: "Bottle Dock", icon: "🍾", blurb: "Send a note across the sea.", door: [5.3, -4.3], label: [6, 1.4, -4.8], action: { type: "notes" }, cta: "Open bottles" },
+  { id: "garage", name: "Island Car", icon: "🚗", blurb: "Your car. Drive anywhere twice as fast.", door: [4.5, 2.4], label: [5.7, 1.7, 2.4], action: { type: "drive" }, cta: "Hop in" },
   { id: "home-adarsh", name: "Adarsh's Museum", icon: "🏠", blurb: "Personal trophy museum.", door: [-17, 0], label: [-17, 3.2, -2.2], action: { type: "route", href: "/museum/adarsh" }, cta: "Enter museum", owner: "adarsh" },
-  { id: "home-devanshi", name: "Devanshi's Museum", icon: "🏠", blurb: "Personal trophy museum.", door: [17, 0], label: [17, 3.2, -2.2], action: { type: "route", href: "/museum/devanshi" }, cta: "Enter museum", owner: "devanshi" },
+  { id: "home-devanshi", name: "Dewanshi's Museum", icon: "🏠", blurb: "Personal trophy museum.", door: [17, 0], label: [17, 3.2, -2.2], action: { type: "route", href: "/museum/devanshi" }, cta: "Enter museum", owner: "devanshi" },
 ];
 
 export const SPAWN: Record<PlayerId, [number, number]> = { adarsh: [-17, 1.6], devanshi: [17, 1.6] };
@@ -84,7 +86,43 @@ export const COIN_SPOTS: [number, number][] = [
   [0, -9.5], [0, 9.5], [-9.3, 0], [9.3, 0],
 ];
 
-export function walkable(x: number, z: number): boolean {
+/** Which islands each bridge connects (index matches BRIDGES). */
+export const BRIDGE_LINKS: [string, string][] = [
+  ["together", "mind"],
+  ["together", "body"],
+  ["together", "adarsh"],
+  ["together", "devanshi"],
+];
+
+export const CAR_SPOT: [number, number] = [5.7, 2.4];
+export const FOUNTAIN_SPOT: [number, number] = [-2.3, -0.4];
+
+/** World state that changes what's walkable. Defaults: everything open. */
+export interface Openings {
+  bridges: boolean[];
+  fountain: boolean;
+}
+const ALL_OPEN: Openings = { bridges: [true, true, true, true], fountain: false };
+
+export function reachableIslands(from: string, bridges: boolean[]) {
+  const seen = new Set([from]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    BRIDGE_LINKS.forEach(([a, b], i) => {
+      if (!bridges[i]) return;
+      if (seen.has(a) && !seen.has(b)) (seen.add(b), (grew = true));
+      if (seen.has(b) && !seen.has(a)) (seen.add(a), (grew = true));
+    });
+  }
+  return seen;
+}
+
+export function islandAt(x: number, z: number) {
+  return ISLANDS.find((i) => (x - i.x) ** 2 + (z - i.z) ** 2 < i.r ** 2)?.id ?? null;
+}
+
+export function walkable(x: number, z: number, open: Openings = ALL_OPEN): boolean {
   let ok = false;
   for (const i of ISLANDS) {
     if ((x - i.x) ** 2 + (z - i.z) ** 2 < (i.r - 0.45) ** 2) {
@@ -93,8 +131,9 @@ export function walkable(x: number, z: number): boolean {
     }
   }
   if (!ok) {
-    for (const b of BRIDGES) {
-      const [x0, x1, z0, z1] = b.box;
+    for (let bi = 0; bi < BRIDGES.length; bi++) {
+      if (!open.bridges[bi]) continue;
+      const [x0, x1, z0, z1] = BRIDGES[bi].box;
       if (x > x0 && x < x1 && z > z0 && z < z1) {
         ok = true;
         break;
@@ -103,5 +142,6 @@ export function walkable(x: number, z: number): boolean {
   }
   if (!ok) return false;
   for (const o of OBSTACLES) if ((x - o.x) ** 2 + (z - o.z) ** 2 < o.r ** 2) return false;
+  if (open.fountain && (x - FOUNTAIN_SPOT[0]) ** 2 + (z - FOUNTAIN_SPOT[1]) ** 2 < 1.45 ** 2) return false;
   return true;
 }

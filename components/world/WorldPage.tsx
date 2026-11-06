@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ISLANDS, ZONES, SPAWN, BRIDGES } from "./layout";
+import { ISLANDS, ZONES, SPAWN, BRIDGES, CAR_SPOT, islandAt, reachableIslands } from "./layout";
+import { buildStates, bridgeProgress } from "@/lib/game/builds";
 import type { Ctl } from "./World";
 import { useStore } from "@/lib/store";
 import { PLAYER_META, partnerOf, type PlayerId } from "@/lib/types";
@@ -25,7 +26,9 @@ export function WorldPage() {
   const log = useStore((s) => s.log);
   const toast = useStore((s) => s.toast);
   const router = useRouter();
-  const ctl = useRef<Ctl>({ joy: { x: 0, y: 0, active: false }, target: null, teleport: null, zoom: 1 });
+  const ctl = useRef<Ctl>({ joy: { x: 0, y: 0, active: false }, target: null, teleport: null, zoom: 1, driving: false });
+  const [driving, setDriving] = useState(false);
+  const [buildOpen, setBuildOpen] = useState(false);
   const [zoneId, setZoneId] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -56,6 +59,11 @@ export function WorldPage() {
     else if (a.type === "sheet") openSheet(a.tab);
     else if (a.type === "route") router.push(a.href);
     else if (a.type === "notes") openNotes();
+    else if (a.type === "drive") {
+      ctl.current.driving = true;
+      setDriving(true);
+      toast({ icon: "🚗", text: "Vroom! You're driving — twice as fast." });
+    }
     else if (a.type === "water") {
       log("water", { data: { glasses: 1 } });
       toast({ icon: "💧", text: `Glass logged · ${(p.days.get(today)?.water ?? 0) + 1} today` });
@@ -72,7 +80,7 @@ export function WorldPage() {
 
   return (
     <div className="world-root">
-      <World ctl={ctl} onZone={setZoneId} onNotes={openNotes} unreadNotes={unread} />
+      <World ctl={ctl} onZone={setZoneId} onNotes={openNotes} unreadNotes={unread} driving={driving} />
 
       {/* top HUD */}
       <div className="hud-top">
@@ -94,6 +102,9 @@ export function WorldPage() {
           <span className={online.includes(partner) ? "dot on" : "dot"} />
           {PLAYER_META[partner].short}
         </div>
+        <button className="hud-chip" onClick={() => setBuildOpen(true)} aria-label="Island projects">
+          🔨
+        </button>
         <button className="hud-chip" onClick={() => setMapOpen(true)} aria-label="Open map">
           🗺️
         </button>
@@ -138,7 +149,19 @@ export function WorldPage() {
         )}
       </AnimatePresence>
 
+      {driving && (
+        <button
+          className="btn btn-primary hop-out"
+          onClick={() => {
+            ctl.current.driving = false;
+            setDriving(false);
+          }}
+        >
+          🚗 Hop out
+        </button>
+      )}
       <Joystick ctl={ctl} />
+      <AnimatePresence>{buildOpen && <BuildPanel onClose={() => setBuildOpen(false)} />}</AnimatePresence>
 
       <AnimatePresence>
         {mapOpen && (
@@ -198,6 +221,9 @@ function Joystick({ ctl }: { ctl: React.MutableRefObject<Ctl> }) {
 }
 
 function MiniMap({ me, onClose, onTravel }: { me: PlayerId; onClose: () => void; onTravel: (x: number, z: number) => void }) {
+  const u = useStore((s) => s.universe);
+  const bp = bridgeProgress(u);
+  const reach = reachableIslands(me, bp.map((x) => x >= 1));
   const S = 6; // px per unit
   const W = 52 * S;
   const tx = (x: number) => W / 2 + x * S;
@@ -212,17 +238,22 @@ function MiniMap({ me, onClose, onTravel }: { me: PlayerId; onClose: () => void;
         </div>
         <svg viewBox={`0 0 ${W} ${W}`} className="map-svg">
           {BRIDGES.map((b, i) => (
-            <line key={i} x1={tx(b.from[0])} y1={tx(b.from[1])} x2={tx(b.to[0])} y2={tx(b.to[1])} stroke="#b07b4f" strokeWidth={8} />
+            <line key={i} x1={tx(b.from[0])} y1={tx(b.from[1])} x2={tx(b.to[0])} y2={tx(b.to[1])} stroke={bp[i] >= 1 ? "#a06d43" : "#14140f"} strokeWidth={bp[i] >= 1 ? 8 : 2.5} strokeDasharray={bp[i] >= 1 ? undefined : "6 6"} />
           ))}
           {ISLANDS.map((i) => (
             <g key={i.id}>
-              <circle cx={tx(i.x)} cy={tx(i.z)} r={i.r * S} fill={i.id === me ? PLAYER_META[me].soft : "#cfe8a9"} stroke="#5b4636" strokeWidth={2} />
+              <circle cx={tx(i.x)} cy={tx(i.z)} r={i.r * S} fill={!reach.has(i.id) ? "#e6e3da" : i.id === me ? PLAYER_META[me].soft : "#d6e8b4"} stroke="#14140f" strokeWidth={2.5} strokeDasharray={reach.has(i.id) ? undefined : "5 5"} />
+              {!reach.has(i.id) && (
+                <text x={tx(i.x)} y={tx(i.z) + 7} textAnchor="middle" fontSize={20}>
+                  🔒
+                </text>
+              )}
               <text x={tx(i.x)} y={tx(i.z) + i.r * S + 14} textAnchor="middle" className="map-label">
                 {i.name}
               </text>
             </g>
           ))}
-          {ZONES.map((z) => (
+          {ZONES.filter((z) => reach.has(islandAt(z.door[0], z.door[1]) ?? "") && (z.id !== "garage" || buildStates(u).find((b) => b.def.id === "car")?.done)).map((z) => (
             <g key={z.id} onClick={() => onTravel(z.door[0], z.door[1])} style={{ cursor: "pointer" }}>
               <circle cx={tx(z.door[0])} cy={tx(z.door[1])} r={11} fill="#fffaf0" stroke="#3a2a1f" strokeWidth={1.5} />
               <text x={tx(z.door[0])} y={tx(z.door[1]) + 5} textAnchor="middle" fontSize={12}>
@@ -234,7 +265,7 @@ function MiniMap({ me, onClose, onTravel }: { me: PlayerId; onClose: () => void;
             <circle cx={tx(SPAWN[me][0])} cy={tx(SPAWN[me][1])} r={9} fill={PLAYER_META[me].color} />
           </g>
         </svg>
-        <p className="muted small">Tap a place to travel there instantly.</p>
+        <p className="muted small">Tap a place to travel there instantly. Dashed islands unlock when their bridge is built — open 🔨 to see how.</p>
       </motion.div>
     </motion.div>
   );
@@ -275,6 +306,44 @@ function NotesPanel({ me, onClose }: { me: PlayerId; onClose: () => void }) {
               <small>
                 {PLAYER_META[n.player].name} · {timeAgo(n.at)}
               </small>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function BuildPanel({ onClose }: { onClose: () => void }) {
+  const u = useStore((s) => s.universe);
+  const list = buildStates(u);
+  const done = list.filter((b) => b.done).length;
+  return (
+    <motion.div className="modal-back" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+      <motion.div className="paper-card" initial={{ y: 30 }} animate={{ y: 0 }} onClick={(e) => e.stopPropagation()}>
+        <div className="card-head">
+          <h3>🔨 Island projects</h3>
+          <button className="icon-btn" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+        </div>
+        <p className="muted small">
+          Your world is built by real life. {done} of {list.length} built. Bridges appear plank by plank as you make progress.
+        </p>
+        <div className="builds">
+          {list.map((b) => (
+            <div key={b.def.id} className={`build ${b.done ? "done" : ""}`}>
+              <span className="build-icon">{b.def.icon}</span>
+              <div className="grow">
+                <b>{b.def.name}</b>
+                <small>{b.done ? "Built ✓" : b.def.how}</small>
+                {!b.done && (
+                  <div className="quest-bar">
+                    <i style={{ width: `${b.pct * 100}%` }} />
+                  </div>
+                )}
+              </div>
+              {!b.done && <span className="mono small">{Math.round(b.pct * 100)}%</span>}
             </div>
           ))}
         </div>

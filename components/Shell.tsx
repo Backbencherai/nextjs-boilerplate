@@ -163,7 +163,9 @@ function CelebrationLayer() {
                   ? "level up"
                   : c.kind === "secret"
                     ? "secret discovered"
-                    : "quest complete"}
+                    : c.kind === "build"
+                      ? "🔨 new build"
+                      : "quest complete"}
             </p>
             <h2 className="display celebrate-title">{c.title}</h2>
             <p className="muted">{c.subtitle}</p>

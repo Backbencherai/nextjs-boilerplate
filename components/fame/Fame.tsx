@@ -114,7 +114,7 @@ function RecordGrid({ rows }: { rows: string[][] }) {
 
 export function certFor(a: AchievementDef, who: Who, at: string) {
   return downloadCertificate({
-    recipient: who === "together" ? "Adarsh & Devanshi" : PLAYER_META[who].name,
+    recipient: who === "together" ? "Adarsh & Dewanshi" : PLAYER_META[who].name,
     title: a.name,
     description: a.desc,
     date: fmtDate(at),

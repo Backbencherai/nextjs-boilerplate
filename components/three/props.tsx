@@ -65,7 +65,7 @@ function IslandProc({
   );
 }
 
-export function Bridge({ from, to, onGround }: { from: [number, number]; to: [number, number]; onGround?: (e: ThreeEvent<MouseEvent>) => void }) {
+export function Bridge({ from, to, onGround, progress = 1 }: { from: [number, number]; to: [number, number]; onGround?: (e: ThreeEvent<MouseEvent>) => void; progress?: number }) {
   const dx = to[0] - from[0];
   const dz = to[1] - from[1];
   const len = Math.hypot(dx, dz);
@@ -73,17 +73,27 @@ export function Bridge({ from, to, onGround }: { from: [number, number]; to: [nu
   const planks = Math.floor(len / 0.45);
   return (
     <group position={[(from[0] + to[0]) / 2, -0.08, (from[1] + to[1]) / 2]} rotation={[0, ang, 0]}>
-      <mesh receiveShadow onClick={onGround} position={[0, -0.02, 0]}>
+      <mesh receiveShadow onClick={progress >= 1 ? onGround : undefined} position={[0, -0.02, 0]} visible={progress >= 1}>
         <boxGeometry args={[1.5, 0.06, len]} />
         <meshStandardMaterial color="#6d4b31" transparent opacity={0} />
       </mesh>
-      {Array.from({ length: planks }).map((_, i) => (
+      {Array.from({ length: Math.round(planks * Math.min(1, progress)) }).map((_, i) => (
         <mesh key={i} position={[0, 0, -len / 2 + 0.25 + i * 0.45]} castShadow receiveShadow rotation={[0, (i % 3) * 0.02, 0]}>
           <boxGeometry args={[1.45, 0.08, 0.38]} />
           {flat(i % 2 ? "#b07b4f" : "#a06d43")}
         </mesh>
       ))}
-      {[-0.75, 0.75].map((x) => (
+      {progress < 1 && (
+        <group position={[0.2, 0.05, -len / 2 - 0.2]}>
+          {[0, 1, 2, 3].map((i) => (
+            <mesh key={i} position={[(i % 2) * 0.1, i * 0.09, 0]} rotation={[0, 0.2 * i, 0]} castShadow>
+              <boxGeometry args={[1.2, 0.08, 0.32]} />
+              {flat("#b07b4f")}
+            </mesh>
+          ))}
+        </group>
+      )}
+      {progress >= 1 && [-0.75, 0.75].map((x) => (
         <group key={x}>
           <mesh position={[x, 0.32, 0]}>
             <boxGeometry args={[0.06, 0.06, len]} />
@@ -184,7 +194,7 @@ function CloudProc({ position, scale = 1, speed = 0.2 }: { position: V3; scale?:
 }
 
 /* ───────── Buildings & landmarks ───────── */
-export function House({ position, rotation = 0, wall, roof, onClick }: { position: V3; rotation?: number; wall: string; roof: string } & Clickable) {
+export function House({ position, rotation = 0, wall, roof, onClick, tier = 0 }: { position: V3; rotation?: number; wall: string; roof: string; tier?: number } & Clickable) {
   const smoke = useRef<THREE.Group>(null);
   useFrame(({ clock }) => {
     smoke.current?.children.forEach((c, i) => {
@@ -200,10 +210,69 @@ export function House({ position, rotation = 0, wall, roof, onClick }: { positio
         <boxGeometry args={[2, 1.4, 1.7]} />
         {flat(wall)}
       </mesh>
-      <mesh position={[0, 1.75, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
+      {tier >= 2 && (
+        <group>
+          <mesh position={[0, 1.95, 0]} castShadow receiveShadow>
+            <boxGeometry args={[1.8, 1.1, 1.55]} />
+            {flat(wall)}
+          </mesh>
+          {[-0.45, 0.45].map((x) => (
+            <mesh key={x} position={[x, 2.0, 0.79]}>
+              <boxGeometry args={[0.34, 0.34, 0.05]} />
+              <meshStandardMaterial color="#ffe3a3" emissive="#ffb84d" emissiveIntensity={0.6} />
+            </mesh>
+          ))}
+          {/* balcony */}
+          <mesh position={[0, 1.42, 1.05]} castShadow>
+            <boxGeometry args={[1.2, 0.08, 0.5]} />
+            {flat("#a06d43")}
+          </mesh>
+          {[-0.55, -0.2, 0.2, 0.55].map((x) => (
+            <mesh key={x} position={[x, 1.6, 1.28]}>
+              <boxGeometry args={[0.05, 0.32, 0.05]} />
+              {flat("#7a5232")}
+            </mesh>
+          ))}
+        </group>
+      )}
+      <mesh position={[0, tier >= 2 ? 2.95 : 1.75, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
         <coneGeometry args={[1.65, 0.9, 4]} />
         {flat(roof)}
       </mesh>
+      {tier >= 1 && (
+        <group>
+          {/* picket fence around the front garden */}
+          {Array.from({ length: 13 }).map((_, i) => {
+            const x = -1.8 + i * 0.3;
+            return (
+              <mesh key={i} position={[x, 0.22, 2.1]} castShadow>
+                <boxGeometry args={[0.07, 0.44, 0.06]} />
+                {flat("#ffffff")}
+              </mesh>
+            );
+          })}
+          <mesh position={[0, 0.3, 2.1]}>
+            <boxGeometry args={[3.7, 0.05, 0.04]} />
+            {flat("#ffffff")}
+          </mesh>
+          {/* mailbox */}
+          <mesh position={[1.3, 0.45, 1.7]} castShadow>
+            <boxGeometry args={[0.06, 0.9, 0.06]} />
+            {flat("#7a5232")}
+          </mesh>
+          <mesh position={[1.3, 0.95, 1.7]} castShadow userData={{ keep: true }}>
+            <boxGeometry args={[0.22, 0.18, 0.34]} />
+            {flat(roof)}
+          </mesh>
+          {/* flower boxes */}
+          {[-0.6, 0.6].map((x) => (
+            <mesh key={x} position={[x, 0.62, 0.95]} castShadow userData={{ keep: true }}>
+              <boxGeometry args={[0.42, 0.1, 0.14]} />
+              {flat("#f2c31a")}
+            </mesh>
+          ))}
+        </group>
+      )}
       <mesh position={[0, 0.45, 0.86]}>
         <boxGeometry args={[0.45, 0.85, 0.05]} />
         {flat("#6b4529")}
@@ -214,11 +283,11 @@ export function House({ position, rotation = 0, wall, roof, onClick }: { positio
           <meshStandardMaterial color="#ffe3a3" emissive="#ffb84d" emissiveIntensity={0.6} />
         </mesh>
       ))}
-      <mesh position={[0.6, 2, -0.3]} castShadow>
+      <mesh position={[0.6, tier >= 2 ? 3.2 : 2, -0.3]} castShadow>
         <boxGeometry args={[0.25, 0.7, 0.25]} />
         {flat("#8a7b70")}
       </mesh>
-      <group ref={smoke} position={[0.6, 2.4, -0.3]}>
+      <group ref={smoke} position={[0.6, tier >= 2 ? 3.6 : 2.4, -0.3]}>
         {[0, 1, 2].map((i) => (
           <mesh key={i}>
             <icosahedronGeometry args={[1, 0]} />
@@ -747,4 +816,51 @@ export function Cloud({ position, scale = 1, speed = 0.2 }: { position: V3; scal
 
 export function Bush({ position, scale = 1 }: { position: V3; scale?: number }) {
   return <Asset name="Bush" position={position} scale={scale} rotation={[0, position[2], 0]} />;
+}
+
+/** Fireworks: bursts of ink-outlined confetti over the islands. */
+export function Fireworks({ center = [0, 0, 0] as V3 }: { center?: V3 }) {
+  const N = 4;
+  const P = 36;
+  const g = useRef<THREE.Group>(null);
+  const bursts = useMemo(() => Array.from({ length: N }, (_, i) => ({ t: i * 0.9, x: 0, z: 0, y: 0, color: ["#f2c31a", "#c0342a", "#2b5a9b", "#ffffff"][i % 4] })), []);
+  const dirs = useMemo(() => Array.from({ length: P }, (_, i) => {
+    const a = (i / P) * Math.PI * 2, b = Math.acos(1 - 2 * ((i * 0.618) % 1));
+    return new THREE.Vector3(Math.cos(a) * Math.sin(b), Math.cos(b), Math.sin(a) * Math.sin(b));
+  }), []);
+  useFrame((_, dt) => {
+    if (!g.current) return;
+    bursts.forEach((b, bi) => {
+      b.t += dt;
+      if (b.t > 3.6) {
+        b.t = 0;
+        b.x = center[0] + (Math.random() - 0.5) * 16;
+        b.z = center[2] + (Math.random() - 0.5) * 10 - 4;
+        b.y = 7 + Math.random() * 4;
+      }
+      const grp = g.current!.children[bi] as THREE.Group;
+      const k = Math.min(1, b.t / 1.1);
+      const r = 2.4 * (1 - (1 - k) ** 3);
+      grp.visible = b.t < 2.4;
+      grp.children.forEach((c, i) => {
+        const d = dirs[i];
+        c.position.set(b.x + d.x * r, b.y + d.y * r - b.t * b.t * 0.35, b.z + d.z * r);
+        c.scale.setScalar(Math.max(0.01, 1 - b.t / 2.4));
+      });
+    });
+  });
+  return (
+    <group ref={g}>
+      {bursts.map((b, bi) => (
+        <group key={bi}>
+          {dirs.map((_, i) => (
+            <mesh key={i} userData={{ keep: true, noLine: true }}>
+              <sphereGeometry args={[0.09, 6, 6]} />
+              <meshBasicMaterial color={b.color} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+    </group>
+  );
 }
