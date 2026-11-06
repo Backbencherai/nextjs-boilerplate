@@ -50,5 +50,5 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
-  return Response.json({ ok: true, google: !!process.env.GOOGLE_CLIENT_ID, googleClientId: process.env.GOOGLE_CLIENT_ID ?? "", db: getDB().kind });
+  return Response.json({ ok: true, google: !!process.env.GOOGLE_CLIENT_ID, googleClientId: process.env.GOOGLE_CLIENT_ID ?? "", mapsKey: process.env.GOOGLE_MAPS_KEY ?? process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ?? "", db: getDB().kind });
 }

@@ -1,0 +1,2 @@
+public/models/car.glb: "Ferrari 458 Italia" by vicent091036 (https://sketchfab.com/models/57bf6cc56931426e87494f554df1dab6),
+as distributed in the three.js examples (examples/models/gltf/ferrari.glb). Creative Commons Attribution (CC BY) — credit shown in the game's Explore screen.

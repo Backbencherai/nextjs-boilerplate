@@ -56,7 +56,7 @@ function Scene({ tiles, land, accent, character, pop, selected, onTile, progress
   const half = (land * T) / 2;
   const centre = (x: number, y: number) => [x * T - half + T / 2, 0, y * T - half + T / 2] as [number, number, number];
   // the ruler stands at the front edge of the land, overlooking the city
-  const heroPos: [number, number, number] = [half * 0.35, 0, -half - 1.3]; // giant president at the back edge, facing the city
+  const heroPos: [number, number, number] = [T * 0.9, 0, T * 1.6]; // a small president standing in front of the town hall, among the citizens
   const stormy = weather.includes("thunderstorm") || weather.includes("typhoon");
   const red = meteor !== "none";
   const occupied = useMemo(() => new Set(tiles.map((t) => `${t[0]},${t[1]}`)), [tiles]);
@@ -166,17 +166,21 @@ function Scene({ tiles, land, accent, character, pop, selected, onTile, progress
 
       {/* you: a giant Head of State among your citizens */}
       <group position={heroPos} rotation={[0, -0.15, 0]}>
-        <Hero character={character} anim={heroAnim} height={3} />
-        <Crown y={3.15} color={accent} />
+        <Hero character={character} anim={heroAnim} height={0.8} />
+        <group scale={0.28}>
+          <Crown y={3.0} color={accent} />
+        </group>
         {title && (
-          <Html position={[0, 3.9, 0]} center distanceFactor={12} style={{ pointerEvents: "none" }}>
+          <Html position={[0, 1.35, 0]} center distanceFactor={12} style={{ pointerEvents: "none" }}>
             <div className="lvl-chip" style={{ whiteSpace: "nowrap", width: "auto", padding: "0 8px" }}>{title}</div>
           </Html>
         )}
       </group>
       {flag && (
         <Suspense fallback={null}>
-          <FlagPole code={flag} at={[heroPos[0] - 2, 0, heroPos[2] - 0.2]} />
+          <group position={[heroPos[0] - 0.7, 0, heroPos[2] - 0.1]} scale={0.42}>
+            <FlagPole code={flag} at={[0, 0, 0]} />
+          </group>
         </Suspense>
       )}
       {night && <Sleepers tiles={tiles} centre={centre} />}

@@ -46,6 +46,7 @@ export interface Timer {
 }
 export interface GameConfig {
   googleClientId?: string;
+  mapsKey?: string;
 }
 export type Season = E.Season & { n: number; day: number; endsAt: number };
 type DM = { id: string; with: string; withName: string; mine: boolean; text: string; at: number };
@@ -94,6 +95,8 @@ interface State {
   visitLandmark(id: string): boolean;
   prepare(calId: string, kind: E.PrepKind): boolean;
   forecast(): Calamity[];
+  payFare(mode: E.Ride, km: number): boolean;
+  buyGear(item: string): boolean;
   call: CallState;
   caller: Caller | null;
   dms: DM[];
@@ -367,8 +370,8 @@ export const useGame = create<State>((set, get) => {
       for (const p of cached) world[p.id] = p;
       set({ world, prices: read("bhv:prices") ?? {} });
       persistStorage();
-      const info = await api<{ googleClientId: string }>("/api/auth/");
-      set({ cfg: { googleClientId: info.googleClientId || "" }, relays: info.ok ? 1 : 0 });
+      const info = await api<{ googleClientId: string; mapsKey: string }>("/api/auth/");
+      set({ cfg: { googleClientId: info.googleClientId || "", mapsKey: info.mapsKey || "" }, relays: info.ok ? 1 : 0 });
       token = read<string>(LS.token);
       const acc = read<Account>(LS.account);
       if (token && acc) {
@@ -475,6 +478,12 @@ export const useGame = create<State>((set, get) => {
     },
     prepare(calId, kind) {
       return run({ a: "prep", cal: calId, kind }, (n) => E.prepare(n, calId, kind), () => get().toast({ icon: E.PREP[kind].icon, title: `${E.PREP[kind].name}: ready`, body: E.PREP[kind].desc, kind: "good" }));
+    },
+    payFare(mode, km) {
+      return run({ a: "fare", mode, km }, (n) => E.payFare(n, mode, km, srvNow()), (r) => get().toast({ icon: "🎟️", title: `${E.RIDE_NAME[mode]}: paid ${r.fare} coins`, kind: "info" }));
+    },
+    buyGear(item) {
+      return run({ a: "gear", item }, (n) => E.buyGear(n, item, srvNow()), (r) => get().toast({ icon: "🛍️", title: r.msg ?? "Bought", kind: "good" }));
     },
     forecast() {
       const { nation, season } = get();

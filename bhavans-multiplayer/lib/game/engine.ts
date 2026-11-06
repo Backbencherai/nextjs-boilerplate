@@ -118,6 +118,7 @@ export interface Nation {
   partners: { id: string; name: string; since: number }[];
   allyReqs: { id: string; name: string; at: number }[];
   stamps: { id: string; name: string; at: number }[];
+  gear?: string[];
   done: string[];
   ledger: Ledger[];
   log: { at: number; kind: ActKind; amount: number; note?: string }[];
@@ -1169,4 +1170,43 @@ export function aiPublic(season: Season, now: number): PublicNation {
     lastSeen: now,
     ai: true,
   };
+}
+
+export type Ride = "cab" | "bus" | "metro" | "jetski" | "boat" | "cruise" | "ski";
+export const RIDE_PER_KM: Record<Ride, number> = { cab: 3, bus: 1, metro: 1.5, jetski: 6, boat: 4, cruise: 0.4, ski: 2 };
+export const RIDE_NAME: Record<Ride, string> = { cab: "Cab", bus: "Bus", metro: "Metro", jetski: "Jet ski", boat: "Boat", cruise: "Cruise", ski: "Ski lift" };
+/** Supplies and outfits bought in Explore shops. Some activities need them. */
+export const GEAR: Record<string, { icon: string; name: string; cost: number; desc: string }> = {
+  trek: { icon: "🥾", name: "Trekking kit", cost: 60, desc: "Boots, backpack, water. Needed for mountain treks." },
+  ski: { icon: "🎿", name: "Ski gear", cost: 140, desc: "Skis, poles, goggles and a warm jacket." },
+  swim: { icon: "🩱", name: "Beachwear", cost: 30, desc: "For beaches, swimming and water sports." },
+  jacket: { icon: "🧥", name: "Life jacket", cost: 25, desc: "Required for jet skis and boats." },
+  camp: { icon: "⛺", name: "Camping supplies", cost: 80, desc: "Tent, stove and food for forest retreats." },
+  suit: { icon: "🤵", name: "President's suit", cost: 200, desc: "Formal outfit for summits and state visits." },
+};
+export const RIDE_NEEDS: Partial<Record<Ride, string>> = { ski: "ski", jetski: "jacket", boat: "jacket" };
+export function buyGear(n0: Nation, item: string, now: number): Result {
+  const g = GEAR[item];
+  if (!g) return { ok: false, err: "Not sold here." };
+  if (n0.gear?.includes(item)) return { ok: false, err: "You already own it." };
+  if (n0.res.coins < g.cost) return { ok: false, err: `${g.name} costs ${g.cost} coins.` };
+  const n = clone(n0);
+  n.res.coins -= g.cost;
+  n.gear = [...(n.gear ?? []), item];
+  pushLedger(n, { at: now, kind: "travel", text: `Bought ${g.name}`, coins: -g.cost });
+  return { ok: true, n, msg: `${g.icon} ${g.name} bought` };
+}
+/** Pay a cab, bus or metro fare in Explore (server-checked, capped per ride). */
+export function payFare(n0: Nation, mode: Ride, km: number, now: number): Result & { fare?: number } {
+  const per = RIDE_PER_KM[mode];
+  if (per === undefined) return { ok: false, err: "Unknown ride." };
+  const need = RIDE_NEEDS[mode];
+  if (need && !n0.gear?.includes(need)) return { ok: false, err: `You need ${GEAR[need].name} first (Shop).` };
+  const d = Math.max(0, Math.min(mode === "cruise" ? 20000 : 80, Number(km) || 0));
+  const fare = Math.max(2, Math.round(d * per));
+  if (n0.res.coins < fare) return { ok: false, err: `The ${mode} fare is ${fare} coins.` };
+  const n = clone(n0);
+  n.res.coins -= fare;
+  pushLedger(n, { at: now, kind: "travel", text: `${RIDE_NAME[mode]} ride, ${d.toFixed(1)} km`, coins: -fare });
+  return { ok: true, n, fare };
 }

@@ -357,6 +357,16 @@ export async function act(id: string, b: Body): Promise<{ ok: boolean; err?: str
         r = { ok: true, n };
         break;
       }
+      case "fare": {
+        const mode = S(b.mode);
+        if (!(mode in E.RIDE_PER_KM)) return { ok: false as const, err: "Unknown ride." };
+        r = E.payFare(n, mode as E.Ride, N(b.km), now);
+        break;
+      }
+      case "gear": {
+        r = E.buyGear(n, S(b.item), now);
+        break;
+      }
       case "profile": {
         if (S(b.character) in CHARACTERS) n.character = S(b.character) as CharId;
         if (/^#[0-9a-f]{6}$/i.test(S(b.color))) n.color = S(b.color);
