@@ -11,6 +11,10 @@ import { Crowd } from "./three/Crowd";
 import { Asset } from "./three/assets";
 import { Logo } from "./Logo";
 import { WorldMap } from "./WorldMap";
+import { Flag } from "./ui";
+import codes from "@/lib/countryCodes.json";
+
+const CC = codes as Record<string, { a2: string; name: string }>;
 import { askLocation } from "@/lib/device";
 
 type Step = "landing" | "auth" | "found";
@@ -97,10 +101,11 @@ function Auth({ onBack }: { onBack: () => void }) {
       g?.accounts.id.initialize({
         client_id: gid,
         callback: async (r: { credential: string }) => {
-          const p = JSON.parse(decodeURIComponent(escape(atob(r.credential.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")))));
           setBusy(true);
           setMsg("Signing in…");
-          await loginGoogle({ sub: p.sub, name: p.name, email: p.email, picture: p.picture });
+          const res = await loginGoogle(r.credential);
+          setBusy(false);
+          setMsg(res === "restored" || res === "new" ? "" : res);
         },
       });
       const el = document.getElementById("gbtn");
@@ -115,7 +120,8 @@ function Auth({ onBack }: { onBack: () => void }) {
     setBusy(true);
     setMsg("Finding your country…");
     const r = await loginEmail(name, email, pin);
-    setMsg(r === "restored" ? "Welcome back!" : "");
+    setBusy(false);
+    setMsg(r === "restored" ? "Welcome back!" : r === "new" ? "" : r);
   };
 
   return (
@@ -169,9 +175,14 @@ function Auth({ onBack }: { onBack: () => void }) {
         ) : (
           <>
             <p className="small muted" style={{ margin: 0 }}>
-              Quick play keeps your country on this device only. You can&apos;t restore it elsewhere.
+              Quick play keeps your sign-in on this device only. Use email to play on several devices.
             </p>
-            <button className="btn primary lg block" disabled={!name.trim()} onClick={() => loginGuest(name)}>
+            <button className="btn primary lg block" disabled={!name.trim()} onClick={async () => {
+                setBusy(true);
+                const r = await loginGuest(name);
+                setBusy(false);
+                if (r !== "new" && r !== "restored") setMsg(r);
+              }}>
               Play as {name.trim() || "…"}
             </button>
           </>
@@ -182,8 +193,7 @@ function Auth({ onBack }: { onBack: () => void }) {
   );
 }
 
-/* ───────── found your nation ───────── */
-const FLAGS = ["🦁", "🐯", "🦅", "🐘", "🐉", "🌞", "🌙", "⭐", "🌸", "🌊", "🏔️", "🔥", "⚡", "🍀", "🦚", "🐬", "🛡️", "👑", "🏹", "🗻", "🌵", "🍁", "🌺", "🕊️"];
+/* ───────── become a country's president ───────── */
 const COLORS = ["#ff9933", "#1f3a93", "#138808", "#d23a3a", "#7a4fd8", "#0fa3a3", "#e0a100", "#e0407a", "#3b3b46", "#6b8e23"];
 
 function Found() {
@@ -191,33 +201,42 @@ function Found() {
   const account = useGame((s) => s.account);
   const logout = useGame((s) => s.logout);
   const world = useGame((s) => s.world);
+  const claims = useGame((s) => s.claims);
   const [step, setStep] = useState(0);
   const [character, setCharacter] = useState<CharId>("scholar");
-  const [country, setCountry] = useState<{ id: string; name: string; lat: number; lon: number } | null>(null);
+  const [country, setCountry] = useState<{ id: string; name: string; a2: string; lat: number; lon: number } | null>(null);
   const [q, setQ] = useState("");
-  const [name, setName] = useState("");
-  const [flag, setFlag] = useState("🦁");
   const [color, setColor] = useState(COLORS[0]);
   const [role, setRole] = useState<RoleId>("president");
   const [anim, setAnim] = useState<Anim>("cheer");
-  const list = useMemo(() => countryList(), []);
-  const matches = q ? list.filter((c) => c.name.toLowerCase().includes(q.toLowerCase())).slice(0, 6) : [];
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const list = useMemo(() => countryList().filter((c) => CC[c.id]), []);
   const others = Object.values(world);
-
-  const pick = (id: string, nm: string, at?: { lat: number; lon: number }) => {
-    const spot = at ?? spotIn(id, Math.random());
-    setCountry({ id, name: nm, ...spot });
-    if (!name) setName(`${nm.split(" ")[0]} Republic`);
+  const takenBy = (id: string) => {
+    const owner = claims[id];
+    return owner && owner !== account?.id ? world[owner] ?? { president: "another player", name: CC[id]?.name } : null;
   };
-  const steps = ["Character", "Country", "Nation", "Role"];
-  const canNext = step === 1 ? !!country : step === 2 ? name.trim().length >= 3 : true;
+  const matches = q ? list.filter((c) => c.name.toLowerCase().includes(q.toLowerCase())).slice(0, 8) : [];
+
+  const pick = (id: string, at?: { lat: number; lon: number }) => {
+    const c = CC[id];
+    if (!c) return setErr("That territory can't have a president. Pick a country.");
+    const t = takenBy(id);
+    if (t) return setErr(`${c.name} already has a president: ${t.president}. Choose another country.`);
+    setErr("");
+    setCountry({ id, name: c.name, a2: c.a2, ...(at ?? spotIn(id, 0.5)) });
+  };
+  const steps = ["President", "Country", "Role"];
+  const canNext = step === 1 ? !!country : true;
+  const title = country ? `President of ${country.name}` : "President";
 
   return (
     <motion.div className="auth" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <div className="auth-card stack" style={{ maxWidth: step === 1 ? 900 : 560 }}>
         <div className="row between">
           <span className="kicker">
-            President {account?.name} · {steps[step]}
+            {account?.name} · {steps[step]}
           </span>
           <button className="link small" onClick={logout}>
             switch account
@@ -231,7 +250,7 @@ function Found() {
 
         {step === 0 && (
           <>
-            <h2 className="page-title">Choose your ruler</h2>
+            <h2 className="page-title">Choose your president</h2>
             <div className="char-stage" onClick={() => setAnim((a) => (a === "cheer" ? "attack" : "cheer"))}>
               <Canvas shadows camera={{ position: [0, 1.3, 4.2], fov: 38 }} dpr={[1, 2]}>
                 <Ink wash={0.2} />
@@ -250,15 +269,21 @@ function Found() {
                 </button>
               ))}
             </div>
-            <p className="tiny muted center">You rule as a giant over your little citizens, crowned in your nation&apos;s colours. Tap your ruler to see a move.</p>
+            <label className="f">Sash &amp; crown colour</label>
+            <div className="swatches">
+              {COLORS.map((c) => (
+                <button key={c} className={color === c ? "on" : ""} style={{ background: c }} onClick={() => setColor(c)} aria-label={c} />
+              ))}
+            </div>
+            <p className="tiny muted center">This character becomes your country&apos;s president: the giant leader who stands over your citizens.</p>
           </>
         )}
 
         {step === 1 && (
           <>
-            <h2 className="page-title">Choose your country</h2>
+            <h2 className="page-title">Which country will you lead?</h2>
             <p className="muted small" style={{ margin: 0 }}>
-              Tap a country on the map, search, or use your location. Many players can share a country, and each gets their own city in it.
+              Every real country has exactly one president. Coloured countries are already taken.
             </p>
             <div className="row wrap">
               <input className="input grow" placeholder="Search countries…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -270,71 +295,41 @@ function Found() {
                   const lat = Math.round(p.coords.latitude * 10) / 10;
                   const lon = Math.round(p.coords.longitude * 10) / 10;
                   const f = countryAt(lat, lon);
-                  if (f) pick(String(f.id), f.properties.name, { lat, lon });
+                  if (f) pick(String(f.id), { lat, lon });
                 }}
               >
-                📍 Use my location
+                📍 Where I am
               </button>
             </div>
             {matches.length > 0 && (
               <div className="row wrap">
-                {matches.map((m) => (
-                  <button key={m.id} className="chip" onClick={() => (pick(m.id, m.name), setQ(""))}>
-                    {m.name}
-                  </button>
-                ))}
+                {matches.map((m) => {
+                  const t = takenBy(m.id);
+                  return (
+                    <button key={m.id} className="chip" disabled={!!t} onClick={() => (pick(m.id), setQ(""))} title={t ? `Taken by ${t.president}` : ""}>
+                      <Flag code={CC[m.id].a2} /> {m.name} {t ? "· taken" : ""}
+                    </button>
+                  );
+                })}
               </div>
             )}
-            <WorldMap nations={others} picked={country?.id} onCountry={(id, nm) => pick(id, nm)} height="min(52dvh, 460px)" />
-            <div className="card flat saffron">
-              <b>{country ? `🏳️ ${country.name}` : "No country chosen yet"}</b>
-              <span className="small">{country ? `${others.filter((o) => o.home.cc === country.id).length} other players here` : "Your capital will be placed inside it."}</span>
+            <WorldMap nations={others} picked={country?.id} onCountry={(id, _nm, ll) => pick(id, { lat: ll[1], lon: ll[0] })} height="min(52dvh, 460px)" />
+            {err && <p className="small" style={{ color: "var(--red)", margin: 0 }}>{err}</p>}
+            <div className="card flat saffron row">
+              {country && <Flag code={country.a2} size={40} />}
+              <div>
+                <b>{country ? country.name : "No country chosen yet"}</b>
+                <div className="small">{country ? `You will be ${title}.` : "Tap a free country."}</div>
+              </div>
             </div>
           </>
         )}
 
         {step === 2 && (
           <>
-            <h2 className="page-title">Name your nation</h2>
-            <label className="f">
-              Nation name
-              <input className="input" value={name} onChange={(e) => setName(e.target.value.slice(0, 28))} placeholder="e.g. Republic of Sunrise" />
-            </label>
-            <label className="f">Emblem</label>
-            <div className="flags">
-              {FLAGS.map((f) => (
-                <button key={f} className={flag === f ? "on" : ""} onClick={() => setFlag(f)}>
-                  {f}
-                </button>
-              ))}
-            </div>
-            <label className="f">National colour</label>
-            <div className="swatches">
-              {COLORS.map((c) => (
-                <button key={c} className={color === c ? "on" : ""} style={{ background: c }} onClick={() => setColor(c)} aria-label={c} />
-              ))}
-            </div>
-            <div className="card flat row" style={{ borderColor: color }}>
-              <span className="flag" style={{ background: color }}>
-                {flag}
-              </span>
-              <div>
-                <b className="display" style={{ fontSize: 22 }}>
-                  {name || "Your nation"}
-                </b>
-                <div className="small muted">
-                  in {country?.name} · President {account?.name}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {step === 3 && (
-          <>
-            <h2 className="page-title">Pick your role</h2>
+            <h2 className="page-title">Your speciality</h2>
             <p className="muted small" style={{ margin: 0 }}>
-              Your speciality. You can switch once a day.
+              It shapes how {country?.name ?? "your country"} grows. You can switch once a day.
             </p>
             <div className="roles">
               {(Object.keys(ROLES) as RoleId[]).map((r) => (
@@ -345,23 +340,35 @@ function Found() {
                 </button>
               ))}
             </div>
+            {err && <p className="small" style={{ color: "var(--red)", margin: 0 }}>{err}</p>}
           </>
         )}
 
         <div className="row between">
-          <button className="btn" disabled={step === 0} onClick={() => setStep(step - 1)}>
+          <button className="btn" disabled={step === 0 || busy} onClick={() => setStep(step - 1)}>
             Back
           </button>
-          {step < 3 ? (
+          {step < 2 ? (
             <button className="btn primary" disabled={!canNext} onClick={() => setStep(step + 1)}>
               Next
             </button>
           ) : (
             <button
               className="btn saffron lg"
-              onClick={() => country && found({ name: name.trim(), flag, color, character, role, home: { cc: country.id, country: country.name, lat: country.lat, lon: country.lon } })}
+              disabled={busy || !country}
+              onClick={async () => {
+                if (!country) return;
+                setBusy(true);
+                const e = await found({ cc: country.id, color, character, role, lat: country.lat, lon: country.lon });
+                setBusy(false);
+                if (e) {
+                  setErr(e);
+                  setStep(1);
+                  setCountry(null);
+                }
+              }}
             >
-              🏛️ Found {name.trim() || "nation"}
+              {busy ? "Taking office…" : `🏛️ Become ${title}`}
             </button>
           )}
         </div>

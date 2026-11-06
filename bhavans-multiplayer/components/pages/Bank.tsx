@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useGame } from "@/lib/store";
 import * as E from "@/lib/game/engine";
 import { LOAN_RATE, SAVINGS_RATE } from "@/lib/game/rules";
-import { Stat, ago, fmt } from "../ui";
+import { Stat, ago, fmt, Flag } from "../ui";
 
 export function Bank() {
   const n = useGame((s) => s.nation)!;
@@ -24,7 +24,7 @@ export function Bank() {
   return (
     <main className="page">
       <header>
-        <p className="kicker">{n.flag} National Bank of {n.name}</p>
+        <p className="kicker"><Flag code={n.flag} /> National Bank of {n.name}</p>
         <h1 className="page-title">Bank</h1>
       </header>
       {!has && (
@@ -107,7 +107,7 @@ export function Bank() {
               <option value="">Choose a country…</option>
               {others.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.flag} {p.name} ({p.president})
+                  <Flag code={p.flag} /> {p.name} ({p.president})
                 </option>
               ))}
             </select>

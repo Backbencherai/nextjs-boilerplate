@@ -5,7 +5,7 @@ import { useGame, kmTo } from "@/lib/store";
 import * as E from "@/lib/game/engine";
 import { AI_ID, AI_NAME } from "@/lib/game/rules";
 import { nextAiRaid } from "@/lib/game/world";
-import { Bar, Stat, fmt, left, useNow } from "../ui";
+import { Bar, Stat, fmt, left, useNow, Flag } from "../ui";
 
 export function War() {
   const n = useGame((s) => s.nation)!;
@@ -112,7 +112,7 @@ export function War() {
               <option value="">Choose a target…</option>
               {targets.map((t) => (
                 <option key={t.id} value={t.id} disabled={!t.ai && t.shieldUntil > now}>
-                  {t.flag} {t.name} · 🛡️{fmt(t.defense)} {!t.ai && t.shieldUntil > now ? "(shielded)" : ""}
+                  <Flag code={t.flag} /> {t.name} · 🛡️{fmt(t.defense)} {!t.ai && t.shieldUntil > now ? "(shielded)" : ""}
                 </option>
               ))}
             </select>

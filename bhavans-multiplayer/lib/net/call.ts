@@ -1,39 +1,65 @@
 "use client";
 /**
- * President-to-president voice calls. Audio flows peer-to-peer (WebRTC); the relay only carries the
- * tiny "ring / offer / answer / ice / hangup" signals. Works on phones and computers with a microphone.
+ * President-to-president voice and video calls. Media flows peer-to-peer (WebRTC), relayed through TURN
+ * when networks are strict, so calls connect from anywhere. The game server only carries the signals.
+ * ICE is gathered fully before sending (non-trickle), so one offer and one answer are enough.
  */
 export type Signal =
-  | { t: "ring"; call: string; from: string; fromName: string; sdp: RTCSessionDescriptionInit }
+  | { t: "ring"; call: string; from: string; fromName: string; video: boolean; sdp: RTCSessionDescriptionInit }
   | { t: "answer"; call: string; from: string; sdp: RTCSessionDescriptionInit }
-  | { t: "ice"; call: string; from: string; c: RTCIceCandidateInit }
   | { t: "hangup"; call: string; from: string; reason?: string };
 
 export interface CallState {
-  state: "idle" | "calling" | "ringing" | "active";
+  state: "idle" | "calling" | "ringing" | "connecting" | "active";
   call?: string;
   peer?: string;
   peerName?: string;
   since?: number;
   muted?: boolean;
+  video?: boolean;
+  camOff?: boolean;
+  reason?: string;
 }
 
-const DEFAULT_ICE: RTCIceServer[] = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
+let iceCache: RTCIceServer[] | null = null;
+async function iceServers(): Promise<RTCIceServer[]> {
+  if (iceCache) return iceCache;
+  try {
+    const r = await fetch("/api/ice/", { cache: "no-store" });
+    iceCache = ((await r.json()) as { iceServers: RTCIceServer[] }).iceServers;
+  } catch {
+    iceCache = [{ urls: ["stun:stun.l.google.com:19302"] }];
+  }
+  return iceCache;
+}
+
+function gathered(pc: RTCPeerConnection, ms = 3500) {
+  return new Promise<void>((res) => {
+    if (pc.iceGatheringState === "complete") return res();
+    const t = setTimeout(res, ms);
+    pc.addEventListener("icegatheringstatechange", () => {
+      if (pc.iceGatheringState === "complete") {
+        clearTimeout(t);
+        res();
+      }
+    });
+  });
+}
 
 export class Caller {
   private pc: RTCPeerConnection | null = null;
-  private local: MediaStream | null = null;
+  local: MediaStream | null = null;
+  remote: MediaStream | null = null;
   private audio: HTMLAudioElement | null = null;
-  private pendingOffer: Signal | null = null;
-  private queued: RTCIceCandidateInit[] = [];
+  private pendingOffer: Extract<Signal, { t: "ring" }> | null = null;
   private ringTimer: ReturnType<typeof setInterval> | null = null;
   state: CallState = { state: "idle" };
+  onMedia: () => void = () => {};
 
   constructor(
     private me: () => { id: string; name: string },
     private send: (to: string, s: Signal) => void,
-    private onState: (s: CallState) => void,
-    private ice: RTCIceServer[] = DEFAULT_ICE
+    private onState: (s: CallState) => void
   ) {}
 
   private set(s: CallState) {
@@ -41,55 +67,67 @@ export class Caller {
     this.onState(s);
   }
 
-  private async setup(peer: string, call: string) {
-    this.local = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-    const pc = new RTCPeerConnection({ iceServers: this.ice });
+  private async setup(video: boolean) {
+    try {
+      this.local = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+        video: video ? { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } : false,
+      });
+    } catch (e) {
+      if (!video) throw e;
+      this.local = await navigator.mediaDevices.getUserMedia({ audio: true }); // no camera: fall back to voice
+    }
+    const pc = new RTCPeerConnection({ iceServers: await iceServers() });
     this.pc = pc;
     this.local.getTracks().forEach((t) => pc.addTrack(t, this.local!));
-    pc.onicecandidate = (e) => e.candidate && this.send(peer, { t: "ice", call, from: this.me().id, c: e.candidate.toJSON() });
+    if (video && !this.local.getVideoTracks().length) pc.addTransceiver("video", { direction: "recvonly" });
     pc.ontrack = (e) => {
+      this.remote = e.streams[0] ?? new MediaStream([e.track]);
       if (!this.audio) {
         this.audio = new Audio();
         this.audio.autoplay = true;
       }
-      this.audio.srcObject = e.streams[0];
+      this.audio.srcObject = this.remote;
       this.audio.play().catch(() => {});
+      this.onMedia();
     };
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "connected") this.set({ ...this.state, state: "active", since: Date.now() });
-      if (pc.connectionState === "failed" || pc.connectionState === "closed") this.end("lost");
+      if (pc.connectionState === "connected") this.set({ ...this.state, state: "active", since: this.state.since ?? Date.now() });
+      if (pc.connectionState === "failed") this.end("connection failed");
     };
+    this.onMedia();
     return pc;
   }
 
-  async dial(peer: string, peerName: string) {
+  async dial(peer: string, peerName: string, video = false) {
     if (this.state.state !== "idle") return;
     const call = "call-" + Math.random().toString(36).slice(2, 10);
-    this.set({ state: "calling", call, peer, peerName });
+    this.set({ state: "calling", call, peer, peerName, video });
     try {
-      const pc = await this.setup(peer, call);
-      const offer = await pc.createOffer({ offerToReceiveAudio: true });
-      await pc.setLocalDescription(offer);
-      this.send(peer, { t: "ring", call, from: this.me().id, fromName: this.me().name, sdp: offer });
+      const pc = await this.setup(video);
+      await pc.setLocalDescription(await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: video }));
+      await gathered(pc);
+      if (this.state.call !== call) return;
+      this.send(peer, { t: "ring", call, from: this.me().id, fromName: this.me().name, video, sdp: pc.localDescription!.toJSON() });
       setTimeout(() => this.state.call === call && this.state.state === "calling" && this.end("no answer"), 45_000);
     } catch {
-      this.end("mic blocked");
+      this.end(video ? "camera/mic blocked" : "mic blocked");
     }
   }
 
-  async accept() {
+  async accept(withVideo?: boolean) {
     const s = this.pendingOffer;
-    if (!s || s.t !== "ring") return;
+    if (!s) return;
     this.stopRing();
+    const video = withVideo ?? s.video;
+    this.set({ ...this.state, state: "connecting", video });
     try {
-      const pc = await this.setup(s.from, s.call);
+      const pc = await this.setup(video);
       await pc.setRemoteDescription(s.sdp);
-      for (const c of this.queued) await pc.addIceCandidate(c).catch(() => {});
-      this.queued = [];
-      const ans = await pc.createAnswer();
-      await pc.setLocalDescription(ans);
-      this.send(s.from, { t: "answer", call: s.call, from: this.me().id, sdp: ans });
-      this.set({ state: "active", call: s.call, peer: s.from, peerName: s.fromName, since: Date.now() });
+      await pc.setLocalDescription(await pc.createAnswer());
+      await gathered(pc);
+      this.send(s.from, { t: "answer", call: s.call, from: this.me().id, sdp: pc.localDescription!.toJSON() });
+      this.pendingOffer = null;
     } catch {
       this.end("mic blocked");
     }
@@ -102,25 +140,44 @@ export class Caller {
   }
 
   end(reason = "ended") {
-    if (this.state.peer && this.state.call) this.send(this.state.peer, { t: "hangup", call: this.state.call, from: this.me().id, reason });
-    this.cleanup();
+    if (this.state.peer && this.state.call && this.state.state !== "idle") this.send(this.state.peer, { t: "hangup", call: this.state.call, from: this.me().id, reason });
+    this.cleanup(reason);
   }
 
   mute(on: boolean) {
     this.local?.getAudioTracks().forEach((t) => (t.enabled = !on));
     this.set({ ...this.state, muted: on });
   }
+  camera(off: boolean) {
+    this.local?.getVideoTracks().forEach((t) => (t.enabled = !off));
+    this.set({ ...this.state, camOff: off });
+  }
+  async flip() {
+    const t = this.local?.getVideoTracks()[0];
+    if (!t || !this.pc) return;
+    const mode = t.getSettings().facingMode === "environment" ? "user" : "environment";
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode } });
+      const nt = s.getVideoTracks()[0];
+      await this.pc.getSenders().find((x) => x.track?.kind === "video")?.replaceTrack(nt);
+      this.local!.removeTrack(t);
+      t.stop();
+      this.local!.addTrack(nt);
+      this.onMedia();
+    } catch {}
+  }
 
-  private cleanup() {
+  private cleanup(reason?: string) {
     this.stopRing();
     this.pc?.close();
     this.pc = null;
     this.local?.getTracks().forEach((t) => t.stop());
     this.local = null;
+    this.remote = null;
     if (this.audio) this.audio.srcObject = null;
     this.pendingOffer = null;
-    this.queued = [];
-    this.set({ state: "idle" });
+    this.set({ state: "idle", reason });
+    this.onMedia();
   }
 
   private ring() {
@@ -153,13 +210,12 @@ export class Caller {
     if (s.t === "ring") {
       if (this.state.state !== "idle") return this.send(s.from, { t: "hangup", call: s.call, from: this.me().id, reason: "busy" });
       this.pendingOffer = s;
-      this.set({ state: "ringing", call: s.call, peer: s.from, peerName: s.fromName });
+      this.set({ state: "ringing", call: s.call, peer: s.from, peerName: s.fromName, video: s.video });
       this.ring();
     } else if (s.call !== this.state.call) return;
-    else if (s.t === "answer") await this.pc?.setRemoteDescription(s.sdp);
-    else if (s.t === "ice") {
-      if (this.pc?.remoteDescription) await this.pc.addIceCandidate(s.c).catch(() => {});
-      else this.queued.push(s.c);
-    } else if (s.t === "hangup") this.cleanup();
+    else if (s.t === "answer") {
+      this.set({ ...this.state, state: "connecting" });
+      await this.pc?.setRemoteDescription(s.sdp).catch(() => this.end("connection failed"));
+    } else if (s.t === "hangup") this.cleanup(s.reason);
   }
 }

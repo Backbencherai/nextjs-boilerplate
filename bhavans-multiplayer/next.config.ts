@@ -1,8 +1,7 @@
 import type { NextConfig } from "next";
 
-// Fully static build -> ./out (Netlify drop, Vercel, any static host). Multiplayer runs browser <-> relay.
+// Server-authoritative game: pages + API routes (deploy on Vercel; data in Upstash Redis).
 const nextConfig: NextConfig = {
-  output: "export",
   trailingSlash: true,
   images: { unoptimized: true },
   turbopack: { root: __dirname },

@@ -8,7 +8,7 @@ import { ACT_META, CHARACTERS, ROLES, ROLE_SWITCH_HOURS, type RoleId } from "@/l
 import { askNotifications, notifyGranted, notifySupported } from "@/lib/device";
 import { Hero } from "../three/Hero";
 import { Ink } from "../three/Ink";
-import { Stat, ago, fmt, left, useNow } from "../ui";
+import { Stat, ago, fmt, left, useNow, Flag } from "../ui";
 
 export function Me() {
   const n = useGame((s) => s.nation)!;
@@ -42,7 +42,7 @@ export function Me() {
                 {CHARACTERS[n.character].name}
               </b>
               <span className="chip">
-                {n.flag} {n.name}
+                <Flag code={n.flag} /> {n.name}
               </span>
             </div>
             <span className="tiny">

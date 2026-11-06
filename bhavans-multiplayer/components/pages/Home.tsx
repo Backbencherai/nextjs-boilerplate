@@ -5,7 +5,7 @@ import { useGame } from "@/lib/store";
 import * as E from "@/lib/game/engine";
 import { ACT_META, AI_NAME, DAILY_GOALS, ROLES, SEASON_DAYS, type ActKind } from "@/lib/game/rules";
 import { CAL_META, COVER_OPEN_MIN, METEOR_WINDOW_MIN, calamitiesBetween, hits, nextAiRaid, nextMeteor } from "@/lib/game/world";
-import { Bar, ResBar, Stat, ago, fmt, left, useNow } from "../ui";
+import { Bar, ResBar, Stat, ago, fmt, left, useNow, Flag } from "../ui";
 import { useUI } from "../Shell";
 import { Logo } from "../Logo";
 
@@ -48,7 +48,7 @@ export function Home() {
       <header className="row between">
         <div className="row">
           <span className="flag" style={{ background: n.color }}>
-            {n.flag}
+            <Flag code={n.flag} />
           </span>
           <div>
             <p className="kicker">
@@ -96,6 +96,7 @@ export function Home() {
           </div>
         </div>
       )}
+      <Forecast />
       {cals.map((c) => (
         <div key={c.id} className="banner gold">
           <span className="e">{CAL_META[c.type].icon}</span>
@@ -234,5 +235,59 @@ export function Home() {
         </div>
       </div>
     </main>
+  );
+}
+
+/** 7-day disaster forecast for your country, with preparations you can make in advance. */
+function Forecast() {
+  const n = useGame((s) => s.nation)!;
+  const forecast = useGame((s) => s.forecast);
+  const prepare = useGame((s) => s.prepare);
+  const now = useNow(30_000);
+  const list = useMemo(() => forecast(), [forecast, Math.floor(now / 60_000)]); // eslint-disable-line react-hooks/exhaustive-deps
+  const night = E.isNight(n.home, now);
+  const hour = E.localHour(n.home, now);
+  return (
+    <section className="card">
+      <div className="card-h">
+        <h3>🌦️ Disaster forecast · next 7 days</h3>
+        <span className="chip">
+          {night ? "🌙" : "☀️"} {String(Math.floor(hour)).padStart(2, "0")}:{String(Math.floor((hour % 1) * 60)).padStart(2, "0")} in {n.home.country}
+        </span>
+      </div>
+      {!list.length && <p className="small muted" style={{ margin: 0 }}>Clear skies over {n.name} for the next week.</p>}
+      {list.map((c) => {
+        const meta = CAL_META[c.type];
+        const prepped = n.prep?.[c.id];
+        const active = c.start <= now;
+        const urgency = active ? "red" : c.start - now < 24 * 3600_000 ? "gold" : "";
+        return (
+          <div key={c.id} className={`fc-row ${urgency}`}>
+            <span className="e">{meta.icon}</span>
+            <div className="grow">
+              <b>
+                {meta.name} {active ? "· happening now" : `· in ${left(c.start - now)}`}
+              </b>
+              <div className="small muted">
+                {c.region?.name ?? "Tropics-wide"} · {new Date(c.start).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" })} · {meta.effect}
+              </div>
+              {prepped ? (
+                <div className="small" style={{ color: "var(--green)" }}>
+                  ✅ Prepared: {E.PREP[prepped].name} ({E.PREP[prepped].desc})
+                </div>
+              ) : active ? null : (
+                <div className="row wrap" style={{ marginTop: 6, gap: 6 }}>
+                  {(Object.keys(E.PREP) as E.PrepKind[]).map((k) => (
+                    <button key={k} className="btn sm" onClick={() => prepare(c.id, k)} title={E.PREP[k].desc}>
+                      {E.PREP[k].icon} {E.PREP[k].name} · {Object.entries(E.PREP[k].cost).map(([r, v]) => `${v} ${r}`).join(" + ")}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </section>
   );
 }

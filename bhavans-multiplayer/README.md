@@ -2,12 +2,27 @@
 
 A 30-day multiplayer world where **real life builds your country**. Unlimited players, every device, no server to run.
 
-## Deploy
-- **Vercel:** import the GitHub repo, set **Root Directory** to `bhavans-multiplayer`, and deploy. `vercel.json` is already set.
-- **Netlify:** drag the unzipped `Bhavans-Multiplayer-site` folder onto https://app.netlify.com/drop, or import the repo with base directory `bhavans-multiplayer`.
-- **Locally:** run `npm install && npm run dev` (port 3400). `npm run build` writes a static site to `out/`. Run `npm test` for the engine tests.
+## Deploy on Vercel (5 minutes)
 
-Players install it from the browser like an app: iPhone uses Share → Add to Home Screen; Android, Mac, Windows and Linux get an Install button. The `/install` page shows the steps for each device and a QR code.
+The game runs on a real server: every action is checked and calculated there, so nobody can cheat by editing their phone.
+
+1. Push this repo to GitHub (or upload the zip to a new GitHub repo).
+2. On vercel.com → **Add New → Project** → import the repo. If the game is in a sub-folder, set **Root Directory** to `bhavans-multiplayer`. Framework: Next.js (auto).
+3. In the project → **Storage** (or **Marketplace**) → add **Upstash for Redis** (free tier) and connect it to the project. This adds `KV_REST_API_URL` / `KV_REST_API_TOKEN` (or `UPSTASH_REDIS_REST_URL` / `_TOKEN`) automatically. **Without it, data is kept only in memory and is lost when the server sleeps.**
+4. Settings → Environment Variables (recommended):
+   - `AUTH_SECRET`: any long random text (signs logins).
+   - `SEASON_START`: optional, e.g. `2026-11-06T00:00:00Z`. Seasons last 30 days and roll over automatically.
+   - `GOOGLE_CLIENT_ID`: optional, to enable "Continue with Google" (add your Vercel domain as an authorised JavaScript origin).
+   - Calls that work on every network (mobile data, school Wi-Fi): `METERED_API_KEY` + `METERED_DOMAIN` from metered.ca (free 50 GB), or `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL`. Without these a free public relay is used (best effort).
+5. **Deploy**. Open the URL on each phone → Share → *Add to Home Screen* (iPhone) or *Install app* (Android).
+
+Local: `npm install && npm run dev` (http://localhost:3400, in-memory data).
+
+### Fair play (anti-cheat)
+- The server owns every country. The app only sends requests ("build a farm here"); the server checks the cost, time and rules with the same game engine and replies with the result.
+- Study, workout and meditation timers are timed by the **server clock**. Forgetting the timer lets you add at most **60 self-reported minutes a day**. Water, meals, steps and sleep have daily caps.
+- Logins are signed (HMAC). PINs are salted and hashed, and 5 wrong PINs lock the account for 10 minutes.
+- **One president per country**: each real country (with its real name and flag) can be claimed by exactly one player per season.
 
 ## How it plays
 - **Real life → resources:**
@@ -46,24 +61,14 @@ Players install it from the browser like an app: iPhone uses Share → Add to Ho
 - **The Red Meteor:** every 7 days at 14:00 UTC, after a 24-hour warning, a fictional meteor strikes. A bunker plus tapping **Take cover** saves your people, and survivors get rewards.
 - **Seasons:** each lasts 30 days and they roll automatically. There are rankings by power, population, wealth, victories, Centerpoint wins and tourism.
 
-## Multiplayer (no setup)
-Everything syncs through two free public MQTT-over-WebSocket relays, EMQX and HiveMQ, used at once. There is no server and no API keys.
+## Multiplayer
+- `app/api/auth`: sign-in (email + PIN, Google, or name only).
+- `app/api/sync`: each phone checks in about every 3 seconds (about every second during a call). The server advances your country, resolves battles and delivers news, chat, messages, raids, trades and call signals.
+- `app/api/act`: every action, validated by the engine in `lib/game/*`.
+- `app/api/ice`: STUN/TURN servers for **voice and video calls**. Media goes phone-to-phone over WebRTC and is relayed through TURN when networks are strict.
+- Data: Upstash Redis (`lib/server/db.ts`). Seasons, disasters and the Red Meteor are deterministic, so every player sees the same world.
 
-| Topic | What it carries |
-|---|---|
-| `n/<id>` | each nation's public state (retained) |
-| `in/<id>/<event>` | inboxes for raids, transfers, tourists, partnerships, trade, investments and DMs |
-| `news/*`, `chat/*` | ring buffers |
-| `sig/<id>` | live call signalling |
-| `save/<key>` | your **AES-GCM-encrypted** full save, decryptable only with your email + PIN |
-
-**Login:** email + PIN restores your country on any device. Quick play needs only a name. **Google Sign-In** turns on when you put your OAuth Client ID (Google Cloud Console → Credentials, with your domain as an authorised origin) into `public/game-config.json` → `googleClientId`.
-
-`public/game-config.json` also sets the relays, the world name (use a different name for a private world) and the season start.
-
-Honest notes:
-- **Cheating:** the game is client-authoritative, which keeps it serverless and unlimited. A technical player could cheat. A dedicated server would fix that.
-- **Voice calls:** they use public STUN servers. A few strict mobile networks need a TURN server, which you'd add in `lib/net/call.ts`.
+**Realism:** real countries, names and flags; one president each. Real local time (day/night: cities sleep at night and earn 55% less). A 7-day disaster forecast warns you a week, a day and an hour ahead, so you can buy sandbags, plan an evacuation or stockpile in advance.
 
 ## Credits
 - Characters: **KayKit Adventurers** by Kay Lousberg (CC0), trimmed and re-dressed in Blender (`blender/make_cast.py`).

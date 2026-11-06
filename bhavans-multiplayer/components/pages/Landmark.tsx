@@ -1,4 +1,5 @@
 "use client";
+import { Flag } from "@/components/ui";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useGame } from "@/lib/store";
@@ -30,7 +31,7 @@ export function Landmark() {
           <p className="kicker">greetings from {lm.country}</p>
           <p style={{ margin: 0 }}>💡 {lm.fact}</p>
           <p className="small" style={{ margin: 0 }}>
-            — President {n.president} of {n.flag} {n.name}
+            — President {n.president} of <Flag code={n.flag} /> {n.name}
           </p>
           <span className="pc-stamp">{lm.icon}</span>
         </div>

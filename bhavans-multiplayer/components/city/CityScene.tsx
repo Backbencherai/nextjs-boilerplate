@@ -1,7 +1,7 @@
 "use client";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { Html, MapControls, Sparkles } from "@react-three/drei";
-import { useEffect, useMemo, useRef } from "react";
+import { Html, MapControls, Sparkles, Stars } from "@react-three/drei";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { Ink } from "../three/Ink";
 import { Crowd } from "../three/Crowd";
@@ -25,7 +25,19 @@ export interface CityProps {
   meteor?: "none" | "alert" | "strike";
   heroAnim?: Anim;
   compact?: boolean;
+  hour?: number; // local time in the country, 0..24 (day, dusk, night)
+  flag?: string; // ISO alpha-2 code: the real national flag on the pole
+  title?: string;
 }
+
+/** 0 = deep night, 1 = full day, with dawn and dusk in between. */
+export function daylight(h: number) {
+  if (h >= 7 && h < 18) return 1;
+  if (h >= 5 && h < 7) return (h - 5) / 2;
+  if (h >= 18 && h < 20) return 1 - (h - 18) / 2;
+  return 0;
+}
+const mix = (a: string, b: string, t: number) => "#" + new THREE.Color(a).lerp(new THREE.Color(b), t).getHexString();
 
 const T = 2; // world units per tile
 
@@ -37,11 +49,14 @@ export default function CityScene(props: CityProps) {
   );
 }
 
-function Scene({ tiles, land, accent, character, pop, selected, onTile, progress = {}, weather = [], meteor = "none", heroAnim = "idle", compact }: CityProps) {
+function Scene({ tiles, land, accent, character, pop, selected, onTile, progress = {}, weather = [], meteor = "none", heroAnim = "idle", compact, hour = 12, flag, title }: CityProps) {
+  const day = daylight(hour);
+  const dusk = day > 0 && day < 1;
+  const night = day < 0.35;
   const half = (land * T) / 2;
   const centre = (x: number, y: number) => [x * T - half + T / 2, 0, y * T - half + T / 2] as [number, number, number];
   // the ruler stands at the front edge of the land, overlooking the city
-  const heroPos: [number, number, number] = [-half * 0.55, 0, half + 1.45];
+  const heroPos: [number, number, number] = [half * 0.35, 0, -half - 1.3]; // giant president at the back edge, facing the city
   const stormy = weather.includes("thunderstorm") || weather.includes("typhoon");
   const red = meteor !== "none";
   const occupied = useMemo(() => new Set(tiles.map((t) => `${t[0]},${t[1]}`)), [tiles]);
@@ -56,13 +71,17 @@ function Scene({ tiles, land, accent, character, pop, selected, onTile, progress
 
   return (
     <>
-      <color attach="background" args={[red ? "#f3d6cf" : stormy ? "#dfe3ea" : "#eef3ee"]} />
-      <fog attach="fog" args={[red ? "#f3d6cf" : stormy ? "#dfe3ea" : "#eef3ee", 40, 110]} />
-      <Ink wash={0.35} />
-      <hemisphereLight args={["#ffffff", "#c9d6c0", stormy ? 0.8 : 1.15]} />
+      <color attach="background" args={[mix(dusk ? "#f0a36b" : "#141c33", red ? "#f3d6cf" : stormy ? "#dfe3ea" : "#eef3ee", day)]} />
+      <fog attach="fog" args={[mix(dusk ? "#f0a36b" : "#141c33", red ? "#f3d6cf" : stormy ? "#dfe3ea" : "#eef3ee", day), 40, 110]} />
+      <Ink wash={0.35 * (0.4 + 0.6 * day)} />
+      <hemisphereLight args={[mix("#7f8fc9", "#ffffff", day), mix("#1d2238", "#c9d6c0", day), (stormy ? 0.8 : 1.15) * (0.35 + 0.65 * day)]} />
+      {night && <Stars radius={90} depth={30} count={1400} factor={3} fade speed={0.4} />}
+      {night && <directionalLight position={[-14, 22, -8]} intensity={0.35} color="#a9b8ff" />}
+      {night && <StreetLights half={half} />}
       <directionalLight
         position={[14, 26, 10]}
-        intensity={stormy ? 1.0 : 1.8}
+        color={dusk ? "#ffc58a" : "#ffffff"}
+        intensity={(stormy ? 1.0 : 1.8) * day}
         castShadow
         shadow-mapSize={[1536, 1536]}
         shadow-camera-left={-30}
@@ -146,12 +165,23 @@ function Scene({ tiles, land, accent, character, pop, selected, onTile, progress
       )}
 
       {/* you: a giant Head of State among your citizens */}
-      <group position={heroPos} rotation={[0, 0.35, 0]}>
+      <group position={heroPos} rotation={[0, -0.15, 0]}>
         <Hero character={character} anim={heroAnim} height={3} />
         <Crown y={3.15} color={accent} />
+        {title && (
+          <Html position={[0, 3.9, 0]} center distanceFactor={12} style={{ pointerEvents: "none" }}>
+            <div className="lvl-chip" style={{ whiteSpace: "nowrap", width: "auto", padding: "0 8px" }}>{title}</div>
+          </Html>
+        )}
       </group>
-      <Workers tiles={tiles} centre={centre} />
-      <Crowd count={Math.max(3, Math.min(26, Math.round(pop / 5)))} radius={half * 0.95} seed={"city" + land} accents={[accent, "#f2c31a", "#2b5a9b", "#c0342a"]} />
+      {flag && (
+        <Suspense fallback={null}>
+          <FlagPole code={flag} at={[heroPos[0] - 2, 0, heroPos[2] - 0.2]} />
+        </Suspense>
+      )}
+      {night && <Sleepers tiles={tiles} centre={centre} />}
+      {!night && <Workers tiles={tiles} centre={centre} />}
+      <Crowd count={night ? Math.min(4, Math.round(pop / 25)) : Math.max(3, Math.min(26, Math.round(pop / 5)))} radius={half * 0.95} seed={"city" + land} accents={[accent, "#f2c31a", "#2b5a9b", "#c0342a"]} />
       <Traffic half={half} cars={Math.min(6, 1 + Math.floor(tiles.length / 4))} />
       <RivalCampus at={[half + 9, 0, -half + 2]} />
       {tiles.some((t) => t[2] === "station" && t[4] === 0) && <Railway half={half} />}
@@ -434,5 +464,104 @@ function Railway({ half }: { half: number }) {
         ))}
       </group>
     </group>
+  );
+}
+
+/** The country's real flag flying beside the president. */
+function FlagPole({ code, at }: { code: string; at: [number, number, number] }) {
+  // flag SVGs have no pixel size, so draw them onto a canvas first (works on every browser/GPU)
+  const tex = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = 320;
+    c.height = 240;
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    const img = new Image();
+    img.onload = () => {
+      c.getContext("2d")!.drawImage(img, 0, 0, 320, 240);
+      t.needsUpdate = true;
+    };
+    img.src = `/flags/${code}.svg`;
+    return t;
+  }, [code]);
+  const cloth = useRef<THREE.Mesh>(null);
+  const geo = useMemo(() => new THREE.PlaneGeometry(1.5, 1.1, 12, 1), []);
+  const base = useMemo(() => Float32Array.from(geo.attributes.position.array as Float32Array), [geo]);
+  useFrame(({ clock }) => {
+    const p = geo.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < p.count; i++) {
+      const x = base[i * 3] + 0.75;
+      p.setZ(i, Math.sin(x * 3.2 - clock.elapsedTime * 4) * 0.09 * x);
+    }
+    p.needsUpdate = true;
+  });
+  return (
+    <group position={at}>
+      <mesh position={[0, 2, 0]} castShadow>
+        <cylinderGeometry args={[0.05, 0.07, 4, 8]} />
+        <meshStandardMaterial color="#d8d8de" metalness={0.6} roughness={0.3} />
+      </mesh>
+      <mesh position={[0, 4.05, 0]}>
+        <sphereGeometry args={[0.1, 10, 8]} />
+        <meshStandardMaterial color="#f2c31a" metalness={0.7} roughness={0.3} />
+      </mesh>
+      <mesh ref={cloth} geometry={geo} position={[0.78, 3.4, 0]} userData={{ keep: true, noLine: true }}>
+        <meshBasicMaterial map={tex} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
+  );
+}
+
+/** Warm street lamps around the city at night. */
+function StreetLights({ half }: { half: number }) {
+  const spots: [number, number][] = [
+    [-half - 0.6, -half - 0.6],
+    [half + 0.6, -half - 0.6],
+    [-half - 0.6, half + 0.6],
+    [half + 0.6, half + 0.6],
+  ];
+  return (
+    <>
+      {spots.map(([x, z], i) => (
+        <group key={i} position={[x, 0, z]}>
+          <mesh position={[0, 0.9, 0]}>
+            <cylinderGeometry args={[0.04, 0.05, 1.8, 6]} />
+            <meshStandardMaterial color="#2b2b33" />
+          </mesh>
+          <mesh position={[0, 1.85, 0]} userData={{ noLine: true }}>
+            <sphereGeometry args={[0.16, 10, 8]} />
+            <meshBasicMaterial color="#ffd68a" />
+          </mesh>
+          <pointLight position={[0, 1.8, 0]} color="#ffbf66" intensity={14} distance={half * 1.6} decay={1.6} />
+        </group>
+      ))}
+    </>
+  );
+}
+
+/** Citizens asleep: lit windows and a sleepy "Zzz" over homes. */
+function Sleepers({ tiles, centre }: { tiles: TileView[]; centre: (x: number, y: number) => [number, number, number] }) {
+  return (
+    <>
+      {tiles
+        .filter((t) => (t[2] === "house" || t[2] === "hall") && t[4] === 0)
+        .slice(0, 10)
+        .map(([x, y, t], i) => {
+          const c = centre(x, y);
+          return (
+            <group key={`${x},${y}`} position={c}>
+              <mesh position={[0, 0.7, 0]} userData={{ noLine: true }}>
+                <boxGeometry args={[0.5, 0.18, 0.02]} />
+                <meshBasicMaterial color={i % 3 === 0 ? "#3a3a48" : "#ffd27a"} />
+              </mesh>
+              {t === "house" && (
+                <Html position={[0.3, 1.9, 0]} center distanceFactor={20} style={{ pointerEvents: "none" }}>
+                  <div className="zzz">💤</div>
+                </Html>
+              )}
+            </group>
+          );
+        })}
+    </>
   );
 }

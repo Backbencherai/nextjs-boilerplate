@@ -6,7 +6,7 @@ import { useGame } from "@/lib/store";
 import * as E from "@/lib/game/engine";
 import { BUILDINGS, BUILD_ORDER, MAX_LEVEL, RES_META, TECH, TECH_MAX, techCost, type BType, type ResKey, type TechId } from "@/lib/game/rules";
 import { calamitiesBetween, hits, nextMeteor, COVER_OPEN_MIN, METEOR_WINDOW_MIN } from "@/lib/game/world";
-import { Cost, ResBar, Sheet, fmt, left, useNow } from "../ui";
+import { Cost, ResBar, Sheet, fmt, left, useNow, Flag } from "../ui";
 import type { TileView } from "../city/CityScene";
 
 const CityScene = dynamic(() => import("../city/CityScene"), { ssr: false, loading: () => <div className="blank">Building your city…</div> });
@@ -53,15 +53,16 @@ export function City() {
 
   return (
     <div className="city-root">
-      <CityScene tiles={tiles} land={land} accent={n.color} character={n.character} pop={n.pop} selected={sel} onTile={onTile} progress={progress} weather={weather} meteor={meteor} heroAnim={timer ? (timer.kind === "workout" ? "attack" : "interact") : "idle"} />
+      <CityScene tiles={tiles} land={land} accent={n.color} character={n.character} pop={n.pop} selected={sel} onTile={onTile} progress={progress} weather={weather} meteor={meteor} heroAnim={timer ? (timer.kind === "workout" ? "attack" : "interact") : "idle"} hour={Math.round(E.localHour(n.home, now) * 10) / 10} flag={n.flag} title={`President ${n.president}`} />
       <div className="city-top">
         <div className="hud">
           <Link href="/" className="hud-chip" aria-label="Home">
             ←
           </Link>
           <span className="hud-chip">
-            {n.flag} {n.name} · Lv {E.cityLevel(n, now)}
+            <Flag code={n.flag} /> {n.name} · Lv {E.cityLevel(n, now)}
           </span>
+          <span className="hud-chip">{E.isNight(n.home, now) ? "🌙 Night · city asleep" : "☀️ Day"}</span>
           <span className="grow" />
           <button className="hud-chip" onClick={() => setLabs(true)}>
             🔬 Research

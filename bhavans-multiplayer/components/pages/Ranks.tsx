@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useGame } from "@/lib/store";
 import * as E from "@/lib/game/engine";
 import { AI_NAME, SEASON_DAYS } from "@/lib/game/rules";
-import { fmt, left, useNow } from "../ui";
+import { fmt, left, useNow, Flag } from "../ui";
 
 type Cat = "power" | "pop" | "coins" | "wins" | "aiWins" | "tourists";
 const CATS: { id: Cat; label: string; get: (p: E.PublicNation) => number }[] = [
@@ -47,7 +47,7 @@ export function Ranks() {
                 {i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}
               </b>
               <span className="flag" style={{ background: p.color }}>
-                {p.flag}
+                <Flag code={p.flag} />
               </span>
               <div className="grow">
                 <b>{p.name}</b>

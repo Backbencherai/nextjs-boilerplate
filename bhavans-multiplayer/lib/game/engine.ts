@@ -127,7 +127,58 @@ export interface Nation {
   status?: { kind: string; since: number } | null;
   hist?: { key: string; score: number }[]; // daily health scores (currency strength)
   offers?: { id: string; from: string; fromName: string; res: ResKey; qty: number; price: number; at: number }[];
+  timer?: { kind: "study" | "workout" | "meditation"; startedAt: number } | null;
+  prep?: Record<string, PrepKind>;
+  manualMin?: { key: string; min: number };
   portfolio?: Record<string, { qty: number; avg: number; name: string; flag: string }>;
+}
+
+export type PrepKind = "sandbags" | "evacuate" | "stockpile";
+export const PREP: Record<PrepKind, { icon: string; name: string; cost: Partial<Res>; desc: string }> = {
+  sandbags: { icon: "🧱", name: "Sandbags & shutters", cost: { materials: 120 }, desc: "-45% damage from typhoons and tsunamis" },
+  evacuate: { icon: "🚌", name: "Evacuation plan", cost: { coins: 100 }, desc: "-40% losses from any disaster" },
+  stockpile: { icon: "📦", name: "Emergency stockpile", cost: { coins: 60, food: 40 }, desc: "-50% whirlwind losses, +food reserve" },
+};
+export function prepare(n0: Nation, calId: string, kind: PrepKind): Result {
+  if (n0.prep?.[calId]) return { ok: false, err: "Already prepared for this one." };
+  const c = PREP[kind].cost;
+  if (!canAfford(n0, c)) return { ok: false, err: "Not enough resources." };
+  const n = clone(n0);
+  pay(n, c);
+  if (kind === "stockpile") n.res.food += 60;
+  n.prep = { ...(n.prep ?? {}), [calId]: kind };
+  const keys = Object.keys(n.prep);
+  if (keys.length > 60) delete n.prep[keys[0]];
+  return { ok: true, n };
+}
+
+/* server-measured timers: you can't fake the minutes */
+export function startTimer(n0: Nation, kind: "study" | "workout" | "meditation", now: number): Result {
+  if (n0.timer) return { ok: false, err: "A timer is already running." };
+  const n = clone(n0);
+  n.timer = { kind, startedAt: now };
+  n.status = { kind, since: now };
+  return { ok: true, n };
+}
+export function stopTimer(n0: Nation, save: boolean, now: number): Result & { minutes?: number } {
+  if (!n0.timer) return { ok: false, err: "No timer running." };
+  const minutes = Math.floor((now - n0.timer.startedAt) / 60_000);
+  let n = clone(n0);
+  const kind = n.timer!.kind;
+  n.timer = null;
+  n.status = null;
+  if (save && minutes >= 1) n = logActivity(n, kind, minutes, now).n;
+  return { ok: true, n, minutes };
+}
+/** Forgot the timer? Up to 60 self-reported minutes a day, total. */
+export function logManual(n0: Nation, kind: "study" | "workout" | "meditation", minutes: number, now: number): Result {
+  const key = dayKey(now);
+  const used = n0.manualMin?.key === key ? n0.manualMin.min : 0;
+  const m = Math.max(0, Math.min(Math.floor(minutes), 60 - used));
+  if (m < 1) return { ok: false, err: "Daily limit for self-reported minutes reached. Use the timer." };
+  const n = logActivity(n0, kind, m, now).n;
+  n.manualMin = { key, min: used + m };
+  return { ok: true, n };
 }
 
 export interface Note {
@@ -260,13 +311,23 @@ function happyTarget(n: Nation, at: number, shortage: boolean) {
   return Math.max(0, Math.min(100, h));
 }
 
+/** Local hour in the country (from its longitude). */
+export const localHour = (home: { lon: number }, at: number) => (((new Date(at).getUTCHours() + new Date(at).getUTCMinutes() / 60 + home.lon / 15) % 24) + 24) % 24;
+export const isNight = (home: { lon: number }, at: number) => {
+  const h = localHour(home, at);
+  return h < 6 || h >= 20;
+};
+
 export function perHour(n: Nation, at: number, cals: Calamity[] = []): Res {
   const out = emptyRes();
+  const night = isNight(n.home, at);
   for (const t of n.tiles) {
     if (!active(t, at)) continue;
     const mk = BUILDINGS[t.t].makes;
     if (!mk) continue;
-    for (const k of Object.keys(mk) as ResKey[]) out[k] += (mk[k] ?? 0) * t.lvl;
+    // at night markets, factories and the school close; farms and water keep going
+    const nf = night && (t.t === "market" || t.t === "factory" || t.t === "school" || t.t === "station") ? 0.45 : 1;
+    for (const k of Object.keys(mk) as ResKey[]) out[k] += (mk[k] ?? 0) * t.lvl * nf;
   }
   out.coins += n.pop * TAX_PER_CITIZEN_HOUR * (n.role === "president" ? 1.1 : 1);
   const hf = 0.6 + n.happiness / 250;
@@ -327,7 +388,8 @@ export function tick(n0: Nation, now: number, season: Season): { n: Nation; note
   for (const c of cals) {
     if (c.start <= from || c.start > now || n.done.includes(c.id) || !hits(c, n.home)) continue;
     markDone(n, c.id);
-    const m = mitigation(n, c.start);
+    const prep = n.prep?.[c.id];
+    const m = mitigation(n, c.start) * (prep === "sandbags" && (c.type === "typhoon" || c.type === "tsunami") ? 0.55 : prep === "evacuate" ? 0.6 : prep === "stockpile" && c.type === "whirlwind" ? 0.5 : 1);
     const meta = CAL_META[c.type];
     if (c.type === "typhoon") {
       const hit = damageBuildings(n, c.id + n.id, Math.round(2 * m));

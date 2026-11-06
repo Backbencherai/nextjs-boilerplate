@@ -1,12 +1,12 @@
 "use client";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useGame } from "@/lib/store";
 import * as E from "@/lib/game/engine";
 import * as M from "@/lib/game/market";
 import { RES_META, type ResKey } from "@/lib/game/rules";
-import { ago, fmt, useNow } from "./ui";
+import { ago, fmt, useNow, Flag } from "./ui";
 
 type App = "home" | "stocks" | "trade" | "messages" | "calls" | "news";
 
@@ -139,7 +139,7 @@ function Stocks() {
         const price = p ? M.sharePrice(p) : h.avg;
         return (
           <div key={id} className="ph-row">
-            <span>{h.flag}</span>
+            <span><Flag code={h.flag} /></span>
             <div className="grow">
               <b>{h.name}</b>
               <small>
@@ -156,7 +156,7 @@ function Stocks() {
       <p className="kicker">market</p>
       {list.map((p) => (
         <div key={p.id} className="ph-row">
-          <span>{p.flag}</span>
+          <span><Flag code={p.flag} /></span>
           <div className="grow">
             <b>{p.name}</b>
             <small>
@@ -236,7 +236,7 @@ function Trade() {
         <option value="">Choose a buyer…</option>
         {list.map((p) => (
           <option key={p.id} value={p.id}>
-            {p.flag} {p.name}
+            <Flag code={p.flag} /> {p.name}
           </option>
         ))}
       </select>
@@ -271,8 +271,11 @@ function Messages() {
             ←
           </button>
           <b className="grow">{name}</b>
-          <button className="btn sm green" onClick={() => useGame.getState().dial(peer)}>
+          <button className="btn sm green" onClick={() => useGame.getState().dial(peer)} aria-label="Voice call">
             📞
+          </button>
+          <button className="btn sm" onClick={() => useGame.getState().dial(peer, true)} aria-label="Video call">
+            🎥
           </button>
         </div>
         <div className="chat" style={{ maxHeight: 320 }}>
@@ -308,7 +311,7 @@ function Messages() {
       <p className="kicker">new message</p>
       {list.slice(0, 30).map((p) => (
         <button key={p.id} className="ph-row" onClick={() => setPeer(p.id)}>
-          <span>{p.flag}</span>
+          <span><Flag code={p.flag} /></span>
           <div className="grow" style={{ textAlign: "left" }}>
             <b>{p.president}</b>
             <small>{p.name}</small>
@@ -330,15 +333,18 @@ function Calls() {
         const online = Date.now() - p.lastSeen < 3 * 60_000;
         return (
           <div key={p.id} className="ph-row">
-            <span>{p.flag}</span>
+            <span><Flag code={p.flag} /></span>
             <div className="grow">
               <b>{p.president}</b>
               <small>
                 {p.name} · <span className={online ? "dot on" : "dot"} /> {online ? "online" : "offline"}
               </small>
             </div>
-            <button className="btn sm green" disabled={!online} onClick={() => dial(p.id)}>
+            <button className="btn sm green" disabled={!online} onClick={() => dial(p.id)} aria-label="Voice call">
               📞
+            </button>
+            <button className="btn sm" disabled={!online} onClick={() => dial(p.id, true)} aria-label="Video call">
+              🎥
             </button>
           </div>
         );
@@ -366,30 +372,61 @@ function News() {
   );
 }
 
+function Video({ stream, mine }: { stream: MediaStream | null; mine?: boolean }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (ref.current && ref.current.srcObject !== stream) ref.current.srcObject = stream;
+  });
+  if (!stream || !stream.getVideoTracks().length) return null;
+  return <video ref={ref} className={mine ? "vid-me" : "vid-peer"} autoPlay playsInline muted />;
+}
+
 function CallOverlay() {
   const call = useGame((s) => s.call);
+  const caller = useGame((s) => s.caller);
   const accept = useGame((s) => s.acceptCall);
   const decline = useGame((s) => s.declineCall);
   const hangup = useGame((s) => s.hangup);
   const mute = useGame((s) => s.mute);
+  const camera = useGame((s) => s.camera);
+  const flip = useGame((s) => s.flipCamera);
+  const [, bump] = useState(0);
   const now = useNow(1000);
+  useEffect(() => {
+    if (caller) caller.onMedia = () => bump((x) => x + 1);
+  }, [caller]);
   if (call.state === "idle") return null;
   const secs = call.since ? Math.floor((now - call.since) / 1000) : 0;
+  const peerVideo = !!caller?.remote?.getVideoTracks().length;
+  const status =
+    call.state === "ringing" ? (call.video ? "Incoming video call…" : "Incoming call…") : call.state === "calling" ? "Calling…" : call.state === "connecting" ? "Connecting…" : `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
   return (
-    <div className="call">
-      <div className="call-av">📞</div>
+    <div className={`call ${call.video && call.state !== "ringing" ? "video" : ""}`}>
+      {call.video && call.state !== "ringing" && (
+        <div className="vid-wrap">
+          <Video stream={peerVideo ? caller!.remote : null} />
+          {!peerVideo && <div className="call-av">🎥</div>}
+          {!call.camOff && <Video stream={caller?.local ?? null} mine />}
+        </div>
+      )}
+      {!(call.video && call.state !== "ringing") && <div className="call-av">{call.video ? "🎥" : "📞"}</div>}
       <b className="display" style={{ fontSize: 20, textAlign: "center" }}>
         {call.peerName}
       </b>
-      <span>{call.state === "ringing" ? "Incoming call…" : call.state === "calling" ? "Calling…" : `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`}</span>
-      <div className="row center">
+      <span>{status}</span>
+      <div className="row center wrap">
         {call.state === "ringing" ? (
           <>
-            <button className="btn red lg" onClick={decline}>
+            <button className="btn red lg" onClick={() => decline()}>
               Decline
             </button>
-            <button className="btn green lg" onClick={accept}>
-              Answer
+            {call.video && (
+              <button className="btn lg" onClick={() => accept(false)}>
+                🎙️ Voice only
+              </button>
+            )}
+            <button className="btn green lg" onClick={() => accept()}>
+              {call.video ? "🎥 Answer" : "Answer"}
             </button>
           </>
         ) : (
@@ -397,7 +434,17 @@ function CallOverlay() {
             <button className="btn" onClick={() => mute(!call.muted)}>
               {call.muted ? "🔇 Unmute" : "🎙️ Mute"}
             </button>
-            <button className="btn red lg" onClick={hangup}>
+            {call.video && (
+              <>
+                <button className="btn" onClick={() => camera(!call.camOff)}>
+                  {call.camOff ? "📷 Camera on" : "🚫 Camera off"}
+                </button>
+                <button className="btn" onClick={() => flip()}>
+                  🔄 Flip
+                </button>
+              </>
+            )}
+            <button className="btn red lg" onClick={() => hangup()}>
               End call
             </button>
           </>

@@ -9,7 +9,7 @@ import { WorldMap } from "../WorldMap";
 import { LANDMARKS, LM_BY_ID } from "@/lib/game/landmarks";
 import { distanceKm } from "@/lib/game/world";
 import { Journey } from "../city/Journey";
-import { Sheet, Stat, ago, fmt, left, useNow } from "../ui";
+import { Sheet, Stat, ago, fmt, left, useNow, Flag } from "../ui";
 
 const STATUS: Record<string, string> = { study: "📚 studying", workout: "🏋️ working out", meditation: "🧘 meditating", plotting: "🏫 plotting" };
 
@@ -100,7 +100,7 @@ export function World() {
 
       {tab === "map" && (
         <>
-          <WorldMap nations={nations} me={n.id} onNation={setOpen} calamities={cals} links={links} landmarks={showLm ? LANDMARKS : []} onLandmark={setLmOpen} />
+          <WorldMap nations={nations} me={n.id} onNation={setOpen} links={links} landmarks={showLm ? LANDMARKS : []} onLandmark={setLmOpen} />
           <div className="row wrap">
             <button className={`chip ${showLm ? "on" : ""}`} onClick={() => setShowLm(!showLm)}>
               🏛️ landmarks ({n.stamps.filter((s) => s.id.startsWith("lm:")).length}/{LANDMARKS.length} visited)
@@ -124,7 +124,7 @@ export function World() {
             {list.map((p) => (
               <button key={p.id} className="nation-row" onClick={() => setOpen(p.id)}>
                 <span className="flag" style={{ background: p.ai ? "#5a5a66" : p.color }}>
-                  {p.flag}
+                  <Flag code={p.flag} />
                 </span>
                 <div className="grow">
                   <b>
@@ -218,7 +218,7 @@ function Chat() {
         {chat.map((m) => (
           <div key={m.id} className={`msg ${m.from === me ? "me" : ""}`}>
             <small>
-              {m.flag} {m.name} · {ago(m.at)}
+              <Flag code={m.flag} /> {m.name} · {ago(m.at)}
             </small>
             {m.text}
           </div>
@@ -255,7 +255,7 @@ export function NationSheet({ id, onClose, onTrip }: { id: string | null; onClos
         <div className="stack">
           <div className="row">
             <span className="flag" style={{ background: p.ai ? "#5a5a66" : p.color, width: 56, height: 56, fontSize: 32 }}>
-              {p.flag}
+              <Flag code={p.flag} />
             </span>
             <div className="grow">
               <h3 className="h3" style={{ fontSize: 24 }}>

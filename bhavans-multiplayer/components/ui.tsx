@@ -92,3 +92,9 @@ export function Stat({ icon, v, l }: { icon: string; v: ReactNode; l: string }) 
     </div>
   );
 }
+
+/** A real country flag (ISO alpha-2 code), or an emoji for the AI rival. */
+export function Flag({ code, size }: { code: string; size?: number }) {
+  if (/^[a-z]{2}(-[a-z]+)?$/.test(code)) return <img className="flag-img" src={`/flags/${code}.svg`} alt="" style={size ? { width: size, height: size * 0.75 } : undefined} />;
+  return <span>{code}</span>;
+}

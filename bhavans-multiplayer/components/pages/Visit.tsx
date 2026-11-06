@@ -1,10 +1,11 @@
 "use client";
+import * as E from "@/lib/game/engine";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useGame } from "@/lib/store";
 import type { TileView } from "../city/CityScene";
-import { fmt } from "../ui";
+import { fmt, Flag } from "../ui";
 
 const CityScene = dynamic(() => import("../city/CityScene"), { ssr: false, loading: () => <div className="blank">Landing…</div> });
 
@@ -26,13 +27,13 @@ export function Visit() {
     );
   return (
     <div className="city-root">
-      <CityScene tiles={p.tiles as TileView[]} land={p.land} accent={p.color} character={p.character} pop={p.pop} heroAnim="cheer" />
+      <CityScene tiles={p.tiles as TileView[]} land={p.land} accent={p.color} character={p.character} pop={p.pop} heroAnim="cheer" hour={Math.round(E.localHour(p.home, Date.now()) * 10) / 10} flag={p.flag} title={`President ${p.president}`} />
       <div className="city-top">
         <div className="banner navy">
           <span className="e">🧳</span>
           <div className="grow">
             <b>
-              You&apos;re a tourist in {p.flag} {p.name}
+              You&apos;re a tourist in <Flag code={p.flag} /> {p.name}
             </b>
             <div className="small">
               President {p.president} · {p.home.country} · 👥 {fmt(p.pop)} · 😊 {p.happiness}% · 🏙️ Lv {p.cityLevel}

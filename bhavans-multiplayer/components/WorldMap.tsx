@@ -1,10 +1,8 @@
 "use client";
-import { geoCircle, geoNaturalEarth1, geoPath } from "d3-geo";
+import { geoNaturalEarth1, geoPath } from "d3-geo";
 import { useMemo, useRef, useState } from "react";
 import { countries } from "@/lib/geo";
 import type { PublicNation } from "@/lib/game/engine";
-import type { Calamity } from "@/lib/game/world";
-import { CAL_META } from "@/lib/game/world";
 import type { Landmark } from "@/lib/game/landmarks";
 
 const W = 960;
@@ -16,7 +14,6 @@ export interface MapProps {
   onNation?: (id: string) => void;
   onCountry?: (id: string, name: string, lonlat: [number, number]) => void;
   picked?: string | null;
-  calamities?: Calamity[];
   links?: [string, string][];
   flight?: { from: [number, number]; to: [number, number] } | null;
   height?: string;
@@ -24,7 +21,7 @@ export interface MapProps {
   onLandmark?: (id: string) => void;
 }
 
-export function WorldMap({ nations = [], me, onNation, onCountry, picked, calamities = [], links = [], flight, height, landmarks = [], onLandmark }: MapProps) {
+export function WorldMap({ nations = [], me, onNation, onCountry, picked, links = [], flight, height, landmarks = [], onLandmark }: MapProps) {
   const proj = useMemo(() => geoNaturalEarth1().fitExtent([[10, 10], [W - 10, H - 10]], { type: "Sphere" }), []);
   const path = useMemo(() => geoPath(proj), [proj]);
   const feats = useMemo(() => countries().features, []);
@@ -34,6 +31,8 @@ export function WorldMap({ nations = [], me, onNation, onCountry, picked, calami
   const drag = useRef<{ x: number; y: number; vx: number; vy: number; moved: boolean; dist?: number; k?: number } | null>(null);
   const svg = useRef<SVGSVGElement>(null);
   const myHome = nations.find((n) => n.id === me)?.home.cc;
+  // one president per country: a claimed country is painted in its president's colour
+  const owner = useMemo(() => new Map(nations.filter((n) => !n.ai).map((n) => [n.home.cc, n])), [nations]);
 
   const toSvg = (cx: number, cy: number) => {
     const r = svg.current!.getBoundingClientRect();
@@ -111,6 +110,7 @@ export function WorldMap({ nations = [], me, onNation, onCountry, picked, calami
               d={c.d}
               className={`country-path ${c.id === myHome ? "mine" : ""} ${c.id === picked ? "pick" : ""}`}
               strokeWidth={0.6 / k}
+              style={owner.get(c.id) ? { fill: owner.get(c.id)!.color, fillOpacity: c.id === myHome ? 0.9 : 0.6 } : undefined}
               onClick={(e) => {
                 if (drag.current?.moved || !onCountry) return;
                 const p = toSvg(e.clientX, e.clientY);
@@ -119,20 +119,6 @@ export function WorldMap({ nations = [], me, onNation, onCountry, picked, calami
               }}
             />
           ))}
-          {calamities.map((c) => {
-            const meta = CAL_META[c.type];
-            if (!c.region) return null;
-            const circle = geoCircle().center([c.region.lon, c.region.lat]).radius(c.region.km / 111)();
-            const [cx, cy] = proj([c.region.lon, c.region.lat]) ?? [0, 0];
-            return (
-              <g key={c.id} pointerEvents="none">
-                <path d={path(circle) ?? ""} fill={c.type === "rain" ? "#2a8bd833" : "#d23a3a2e"} stroke={c.type === "rain" ? "#2a8bd8" : "#d23a3a"} strokeWidth={1.2 / k} strokeDasharray={`${4 / k} ${3 / k}`} />
-                <text x={cx} y={cy} fontSize={18 / Math.sqrt(k)} textAnchor="middle">
-                  {meta.icon}
-                </text>
-              </g>
-            );
-          })}
           {links.map(([a, b], i) => {
             const A = byId.get(a);
             const B = byId.get(b);
@@ -158,10 +144,14 @@ export function WorldMap({ nations = [], me, onNation, onCountry, picked, calami
             const online = Date.now() - n.lastSeen < 3 * 60_000;
             return (
               <g key={n.id} transform={`translate(${x},${y})`} onClick={(e) => (e.stopPropagation(), !drag.current?.moved && onNation?.(n.id))} style={{ cursor: "pointer" }}>
-                <circle r={r * 1.55} fill={n.id === me ? "#ff9933" : n.ai ? "#5a5a66" : n.color} stroke="#16161d" strokeWidth={1.6 / Math.sqrt(k)} />
-                <text y={r * 0.55} fontSize={r * 1.5} textAnchor="middle">
-                  {n.flag}
-                </text>
+                <rect x={-r * 1.35} y={-r * 1.05} width={r * 2.7} height={r * 2.1} rx={r * 0.3} fill={n.id === me ? "#ff9933" : n.ai ? "#5a5a66" : n.color} stroke="#16161d" strokeWidth={1.6 / Math.sqrt(k)} />
+                {/^[a-z]{2}/.test(n.flag) ? (
+                  <image href={`/flags/${n.flag}.svg`} x={-r * 1.1} y={-r * 0.8} width={r * 2.2} height={r * 1.6} preserveAspectRatio="xMidYMid slice" />
+                ) : (
+                  <text y={r * 0.55} fontSize={r * 1.5} textAnchor="middle">
+                    {n.flag}
+                  </text>
+                )}
                 {online && !n.ai && <circle cx={r * 1.2} cy={-r * 1.2} r={r * 0.45} fill="#3ecf6e" stroke="#16161d" strokeWidth={1 / Math.sqrt(k)} />}
                 {k > 2.2 && (
                   <text y={r * 3.2} fontSize={11 / Math.sqrt(k)} textAnchor="middle" fontWeight={900} stroke="#fff" strokeWidth={3 / Math.sqrt(k)} paintOrder="stroke">

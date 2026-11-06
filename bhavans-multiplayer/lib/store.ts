@@ -1,24 +1,37 @@
 "use client";
+/**
+ * Client game store. The SERVER owns the game: every action is sent to /api/act and the server's copy
+ * of your country replaces the local one. The local engine only predicts results so taps feel instant.
+ */
 import { create } from "zustand";
 import * as E from "./game/engine";
-import { AI_ID, type ActKind, type BType, type CharId, type Res, type RoleId, type TechId } from "./game/rules";
-import { distanceKm, HOUR, nextMeteor, COVER_OPEN_MIN, METEOR_WINDOW_MIN } from "./game/world";
-import { Net, sha, seal, unseal, type ChatMsg, type NewsItem } from "./net/relay";
-import { currentSeason, loadConfig, type GameConfig } from "./config";
+import { AI_ID, type ActKind, type BType, type CharId, type Res, type RoleId, type TechId, type ResKey } from "./game/rules";
+import { distanceKm, nextMeteor, COVER_OPEN_MIN, METEOR_WINDOW_MIN, calamitiesBetween, hits, CAL_META, DAY, HOUR, type Calamity } from "./game/world";
 import { notify, persistStorage } from "./device";
 import { LM_BY_ID } from "./game/landmarks";
 import * as M from "./game/market";
 import { Caller, type CallState, type Signal } from "./net/call";
-import type { ResKey } from "./game/rules";
 
+export interface NewsItem {
+  id: string;
+  at: number;
+  icon: string;
+  text: string;
+  nation?: string;
+}
+export interface ChatMsg {
+  id: string;
+  at: number;
+  from: string;
+  name: string;
+  flag: string;
+  text: string;
+}
 export interface Account {
   id: string;
   name: string;
   email?: string;
-  picture?: string;
   via: "email" | "google" | "guest";
-  secret?: string; // encrypts the cloud save; never leaves this device
-  saveKey?: string;
 }
 export interface Toast {
   id: string;
@@ -31,7 +44,11 @@ export interface Timer {
   kind: "study" | "workout" | "meditation";
   startedAt: number;
 }
-type Season = ReturnType<typeof currentSeason>;
+export interface GameConfig {
+  googleClientId?: string;
+}
+export type Season = E.Season & { n: number; day: number; endsAt: number };
+type DM = { id: string; with: string; withName: string; mine: boolean; text: string; at: number };
 
 interface State {
   booted: boolean;
@@ -40,6 +57,7 @@ interface State {
   account: Account | null;
   nation: E.Nation | null;
   world: Record<string, E.PublicNation>;
+  claims: Record<string, string>;
   news: NewsItem[];
   chat: ChatMsg[];
   relays: number;
@@ -47,13 +65,14 @@ interface State {
   timer: Timer | null;
   visit: string | null;
   now: number;
+  skew: number;
 
   boot(): Promise<void>;
-  loginEmail(name: string, email: string, pin: string): Promise<"restored" | "new">;
-  loginGoogle(cred: { sub: string; name: string; email: string; picture?: string }): Promise<"restored" | "new">;
-  loginGuest(name: string): void;
+  loginEmail(name: string, email: string, pin: string): Promise<"restored" | "new" | string>;
+  loginGoogle(credential: string): Promise<"restored" | "new" | string>;
+  loginGuest(name: string): Promise<"restored" | "new" | string>;
   logout(): void;
-  found(p: { name: string; flag: string; color: string; character: CharId; role: RoleId; home: E.Home }): void;
+  found(p: { cc: string; color: string; character: CharId; role: RoleId; lat: number; lon: number }): Promise<string | null>;
 
   log(kind: ActKind, amount: number, meta?: { quality?: "healthy" | "balanced" | "treat"; note?: string }): void;
   startTimer(kind: Timer["kind"]): void;
@@ -73,8 +92,11 @@ interface State {
   fly(target: string): boolean;
   endVisit(): void;
   visitLandmark(id: string): boolean;
+  prepare(calId: string, kind: E.PrepKind): boolean;
+  forecast(): Calamity[];
   call: CallState;
-  dms: { id: string; with: string; withName: string; mine: boolean; text: string; at: number }[];
+  caller: Caller | null;
+  dms: DM[];
   prices: Record<string, number[]>;
   phone: boolean;
   setPhone(v: boolean): void;
@@ -85,14 +107,16 @@ interface State {
   offerTrade(to: string, k: ResKey, qty: number, price: number): boolean;
   answerTrade(offerId: string, accept: boolean): void;
   dm(to: string, text: string): void;
-  dial(to: string): void;
-  acceptCall(): void;
+  dial(to: string, video?: boolean): void;
+  acceptCall(video?: boolean): void;
   declineCall(): void;
   hangup(): void;
   mute(on: boolean): void;
+  camera(off: boolean): void;
+  flipCamera(): void;
   lastLandmark: string | null;
   ally(target: string, op: "request" | "accept" | "decline" | "end"): void;
-  sendAid(target: string, res: Partial<Res>): boolean;
+  sendAid(target: string, res?: Partial<Res>): boolean;
   takeCover(): void;
   say(text: string): void;
   toast(t: Omit<Toast, "id">): void;
@@ -100,7 +124,7 @@ interface State {
   pub(id: string): E.PublicNation | null;
 }
 
-const LS = { account: "bhv:account", nation: (id: string) => `bhv:nation:${id}`, world: "bhv:world", timer: "bhv:timer" };
+const LS = { account: "bhv:account", token: "bhv:token", world: "bhv:world" };
 const read = <T,>(k: string): T | null => {
   try {
     const v = localStorage.getItem(k);
@@ -115,194 +139,202 @@ const write = (k: string, v: unknown) => {
     else localStorage.setItem(k, JSON.stringify(v));
   } catch {}
 };
-const LS_DMS = "bhv:dms";
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
-let net: Net | null = null;
-let loop: ReturnType<typeof setInterval> | null = null;
-let lastPub = 0;
-let lastPubHash = "";
-let lastCloud = 0;
-let pendingInbox: E.InEvent[] = [];
+let token: string | null = null;
+let since = 0;
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+let tickTimer: ReturnType<typeof setInterval> | null = null;
+let inflight = 0;
 let caller: Caller | null = null;
 
+type Res2<T> = T & { ok: boolean; err?: string };
+async function api<T = Record<string, unknown>>(path: string, body?: unknown): Promise<Res2<T>> {
+  try {
+    const r = await fetch(path, {
+      method: body ? "POST" : "GET",
+      headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+      cache: "no-store",
+    });
+    const j = (await r.json().catch(() => ({ ok: false, err: "Server error." }))) as Res2<T>;
+    if (r.status === 401) j.err = "auth";
+    return j;
+  } catch {
+    return { ok: false, err: "You're offline. Check your internet." } as Res2<T>;
+  }
+}
+
 export const useGame = create<State>((set, get) => {
-  /* ── helpers ── */
-  const commit = (n: E.Nation, publish = true) => {
-    set({ nation: n });
-    write(LS.nation(n.id), n);
-    if (publish) publishSoon(true);
-  };
+  const setNation = (n: E.Nation | null) => set({ nation: n, timer: (n?.timer as Timer | null | undefined) ?? null });
   const fail = (err: string) => {
     get().toast({ icon: "⚠️", title: err, kind: "bad" });
     return false;
   };
-  const onNotes = (notes: E.Note[]) => {
-    const n = get().nation;
+  const showNotes = (notes: E.Note[]) => {
     for (const note of notes) {
       get().toast({ icon: note.icon, title: note.title, body: note.body, kind: note.kind });
       notify(`${note.icon} ${note.title}`, note.body, note.title);
-      if (note.news && n) net?.news({ id: uid(), at: Date.now(), icon: note.icon, text: note.title.includes(n.name) ? note.title : `${n.flag} ${n.name}: ${note.title}`, nation: n.id });
     }
   };
-  const publishSoon = (force = false) => {
+  const srvNow = () => Date.now() + get().skew;
+
+  /** Predict locally (instant UI), then let the server decide. */
+  const run = <R extends E.Result>(body: Record<string, unknown>, predict?: (n: E.Nation) => R, ok?: (r: Extract<R, { ok: true }>) => void): boolean => {
     const n = get().nation;
-    if (!n || !net) return;
-    const now = Date.now();
-    const p = E.toPublic(n, now);
-    const h = JSON.stringify({ ...p, lastSeen: 0 });
-    if (!force && h === lastPubHash && now - lastPub < 60_000) return;
-    if (now - lastPub < 3000 && !force) return;
-    lastPub = now;
-    lastPubHash = h;
-    net.publishNation(p);
-    set((s) => ({ world: { ...s.world, [p.id]: p } }));
-  };
-  const cloudSave = async (force = false) => {
-    const { nation, account } = get();
-    if (!nation || !account?.saveKey || !account.secret || !net) return;
-    if (!force && Date.now() - lastCloud < 30_000) return;
-    lastCloud = Date.now();
-    net.saveCloud(account.saveKey, await seal(account.secret, nation));
-  };
-  const processInbox = () => {
-    let n = get().nation;
-    if (!n || !pendingInbox.length) return;
-    const now = Date.now();
-    const batch = pendingInbox;
-    pendingInbox = [];
-    const notes: E.Note[] = [];
-    for (const ev of batch) {
-      const r = E.applyEvent(n, ev, now);
-      n = r.n;
-      if (r.note) notes.push(r.note);
-      net?.clearInbox(ev.id);
+    if (!n) return false;
+    if (predict) {
+      const r = predict(n);
+      if (!r.ok) return fail(r.err);
+      setNation(r.n);
+      ok?.(r as Extract<R, { ok: true }>);
     }
-    commit(n);
-    onNotes(notes);
+    inflight++;
+    api<{ me?: E.Nation; msg?: string }>("/api/act/", body).then((res) => {
+      inflight--;
+      if (res.me) setNation(res.me);
+      if (!res.ok) {
+        fail(res.err === "auth" ? "Please sign in again." : res.err ?? "Not allowed.");
+        doSync();
+      } else if (res.msg && !predict) get().toast({ icon: "✅", title: res.msg, kind: "good" });
+    });
+    return true;
   };
-  const step = () => {
+
+  const alerts = () => {
     const { nation, season } = get();
-    const now = Date.now();
-    set({ now });
     if (!nation || !season) return;
-    const t = E.tick(nation, now, season);
-    const r = E.resolveMarches(t.n, now, season, (id) => get().pub(id));
-    for (const o of r.outgoing) net?.send(o.to, o.ev);
-    const changed = t.notes.length || r.notes.length || r.outgoing.length;
-    commit(r.n, false);
-    onNotes([...t.notes, ...r.notes]);
-    processInbox();
-    publishSoon(!!changed);
-    cloudSave();
-    // meteor alerts
+    const now = srvNow();
     const m = nextMeteor(season, now);
     if (m) {
       const key = `bhv:meteor-alert:${m.id}`;
       const mins = (m.at - now) / 60_000;
       if (mins < 24 * 60 && mins > COVER_OPEN_MIN && !read(key + ":24")) {
         write(key + ":24", 1);
-        onNotes([{ icon: "☄️", title: "The Red Meteor arrives in under 24 hours", body: "Build or upgrade a Bunker. When the alert opens, tap Take cover.", kind: "bad" }]);
+        showNotes([{ icon: "☄️", title: "The Red Meteor arrives in under 24 hours", body: "Build or upgrade a Bunker. When the alert opens, tap Take cover.", kind: "bad" }]);
       }
       if (mins <= COVER_OPEN_MIN && mins > -METEOR_WINDOW_MIN && !read(key + ":now")) {
         write(key + ":now", 1);
-        onNotes([{ icon: "🚨", title: "METEOR ALERT: take cover now!", body: "Open the app and tap Take cover to protect your people.", kind: "bad" }]);
+        showNotes([{ icon: "🚨", title: "METEOR ALERT: take cover now!", body: "Open the app and tap Take cover to protect your people.", kind: "bad" }]);
       }
     }
+    // disaster early warnings: a week, a day and an hour before it reaches your country
+    for (const c of get().forecast()) {
+      const left = c.start - now;
+      if (left <= 0) continue;
+      const meta = CAL_META[c.type];
+      const where = c.region?.name ?? "the tropics";
+      const tag = left <= HOUR ? "1h" : left <= DAY ? "1d" : "7d";
+      const label = tag === "1h" ? "within the hour" : tag === "1d" ? "within a day" : "this week";
+      if (read(`bhv:cal:${c.id}:${tag}`)) continue;
+      write(`bhv:cal:${c.id}:${tag}`, 1);
+      const ready = nation.prep?.[c.id] ? " You are prepared." : " Prepare now: Home → Disaster forecast.";
+      showNotes([{ icon: meta.icon, title: `${meta.name} warning for ${nation.name}: ${label}`, body: `${meta.effect} (${where}).${ready}`, kind: "bad" }]);
+    }
   };
-  const startNet = async () => {
-    const { cfg } = get();
-    if (!cfg || net) return;
-    net = new Net(cfg.relays, cfg.world);
-    await net.connect({
-      onNation: (p) => {
-        const s = get().season;
-        if (s && p.season !== s.id) return;
-        if (Date.now() - p.lastSeen > 40 * 24 * HOUR) return;
-        set((st) => ({ world: { ...st.world, [p.id]: p } }));
+
+  const doSync = async () => {
+    if (!token) return;
+    const r = await api<{
+      now: number;
+      season: Season;
+      me: E.Nation | null;
+      notes: E.Note[];
+      world: E.PublicNation[];
+      seen: Record<string, number>;
+      news: NewsItem[];
+      chat: ChatMsg[];
+      dms: { id: string; at: number; from: string; fromName: string; to: string; toName: string; text: string }[];
+      sig: Signal[];
+      claims: Record<string, string>;
+    }>(`/api/sync/?since=${since}`);
+    if (!r.ok) {
+      set({ relays: 0 });
+      if (r.err === "auth") get().logout();
+      return;
+    }
+    since = r.now - 1500;
+    const me = get().account?.id;
+    const world = { ...get().world };
+    for (const p of r.world) world[p.id] = p;
+    for (const [id, t] of Object.entries(r.seen)) if (world[id]) world[id] = { ...world[id], lastSeen: Number(t) };
+    for (const id of Object.keys(world)) if (world[id].season !== r.season.id) delete world[id];
+    if (me) delete world[me];
+    set({
+      relays: 1,
+      skew: r.now - Date.now(),
+      season: r.season,
+      world,
+      claims: r.claims,
+      news: r.news,
+      chat: [...r.chat].reverse(),
+      dms: [...r.dms].reverse().map((d) => ({ id: d.id, at: d.at, mine: d.from === me, with: d.from === me ? d.to : d.from, withName: d.from === me ? d.toName : d.fromName, text: d.text })),
+    });
+    if (!inflight) setNation(r.me);
+    showNotes(r.notes);
+    for (const s of r.sig) caller?.onSignal(s);
+    alerts();
+  };
+  const loop = () => {
+    if (syncTimer) clearTimeout(syncTimer);
+    if (!token) return;
+    const busy = get().call.state !== "idle";
+    syncTimer = setTimeout(
+      async () => {
+        await doSync();
+        loop();
       },
-      onGone: (id) =>
-        set((st) => {
-          const w = { ...st.world };
-          delete w[id];
-          return { world: w };
-        }),
-      onInbox: (ev) => {
-        if (ev.type === "dm") {
-          const me = get().nation?.id;
-          if (!get().dms.some((d) => d.id === ev.id)) {
-            const dms = [...get().dms, { id: ev.id, with: ev.from, withName: ev.fromName, mine: false, text: ev.text, at: ev.at }].slice(-300);
-            set({ dms });
-            write("bhv:dms", dms);
-            if (Date.now() - ev.at < 120_000 && ev.from !== me) {
-              get().toast({ icon: "💬", title: ev.fromName, body: ev.text, kind: "info" });
-              notify(`💬 ${ev.fromName}`, ev.text, "dm-" + ev.from);
-            }
-          }
-          net?.clearInbox(ev.id);
-          return;
-        }
-        pendingInbox.push(ev);
-        if (get().nation) processInbox();
-      },
-      onNews: (item) => set((st) => ({ news: [item, ...st.news.filter((x) => x.id !== item.id)].sort((a, b) => b.at - a.at).slice(0, 120) })),
-      onChat: (m) => set((st) => ({ chat: [...st.chat.filter((x) => x.id !== m.id), m].sort((a, b) => a.at - b.at).slice(-150) })),
-      onStatus: (relays) => set({ relays }),
-      onSignal: (s) => caller?.onSignal(s as Signal),
+      busy ? 900 : document.visibilityState === "hidden" ? 15_000 : 3000
+    );
+  };
+  const start = () => {
+    if (tickTimer) return;
+    tickTimer = setInterval(() => {
+      set({ now: Date.now() });
+      // smooth local preview of production between server syncs (the server's numbers always win)
+      const { nation, season } = get();
+      if (nation && season && !inflight) set({ nation: E.tick(nation, srvNow(), season).n });
+    }, 4000);
+    setInterval(() => {
+      const ps = { ...get().prices };
+      const n = get().nation;
+      const all = [...Object.values(get().world), ...(n ? [E.toPublic(n)] : [])];
+      for (const p of all) ps[p.id] = [...(ps[p.id] ?? []), M.sharePrice(p)].slice(-60);
+      set({ prices: ps });
+      write("bhv:prices", ps);
+      write(LS.world, Object.values(get().world).slice(0, 300));
+    }, 60_000);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") doSync().then(loop);
     });
     caller = new Caller(
       () => {
         const n = get().nation;
-        return { id: n?.id ?? get().account?.id ?? "", name: n ? `${n.flag} President ${n.president} of ${n.name}` : "A president" };
+        return { id: n?.id ?? get().account?.id ?? "", name: n ? `President ${n.president} of ${n.name}` : "A president" };
       },
-      (to, s) => net?.signal(to, s),
-      (call) => set({ call })
+      (to, s) => void api("/api/act/", { a: "signal", to, s }),
+      (call) => {
+        const was = get().call.state;
+        set({ call });
+        if (call.state === "ringing" && was !== "ringing") notify(`📞 ${call.peerName}`, call.video ? "Incoming video call" : "Incoming call", "call");
+        if (call.state === "idle" && was !== "idle" && call.reason && call.reason !== "ended") get().toast({ icon: "📞", title: `Call ended: ${call.reason}`, kind: "info" });
+        loop();
+      }
     );
-    // stock price history (sampled from public data, so everyone sees the same chart)
-    setInterval(() => {
-      const w = get().world;
-      const ps = { ...get().prices };
-      for (const p of Object.values(w)) ps[p.id] = [...(ps[p.id] ?? []), M.sharePrice(p)].slice(-60);
-      set({ prices: ps });
-      write("bhv:prices", ps);
-    }, 60_000);
-    const acc = get().account;
-    if (acc) net.setMe(acc.id);
+    set({ caller });
   };
-  const startLoop = () => {
-    if (loop) return;
-    loop = setInterval(step, 4000);
-    step();
-    publishSoon(true);
-    window.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") {
-        const n = get().nation;
-        if (n) write(LS.nation(n.id), n);
-        cloudSave(true);
-      } else step();
-    });
-    setInterval(() => {
-      const w = get().world;
-      write(LS.world, Object.values(w).slice(0, 400));
-    }, 30_000);
-  };
-  const afterLogin = async (acc: Account): Promise<"restored" | "new"> => {
+  const signedIn = async (r: Res2<{ token?: string; id?: string; name?: string }>, via: Account["via"], email?: string) => {
+    if (!r.ok || !r.token || !r.id) return r.err ?? "Couldn't sign in.";
+    token = r.token;
+    write(LS.token, token);
+    const acc: Account = { id: r.id, name: r.name ?? "President", via, email };
     write(LS.account, acc);
     set({ account: acc });
-    await startNet();
-    net!.setMe(acc.id);
-    const season = get().season!;
-    let n = read<E.Nation>(LS.nation(acc.id));
-    if (!n && acc.saveKey && acc.secret) {
-      const blob = await net!.loadCloud(acc.saveKey);
-      if (blob) n = await unseal<E.Nation>(acc.secret, blob);
-    }
-    if (n && n.season === season.id) {
-      set({ nation: n });
-      startLoop();
-      return "restored";
-    }
-    return "new";
+    since = 0;
+    await doSync();
+    start();
+    loop();
+    return get().nation ? "restored" : "new";
   };
 
   return {
@@ -312,6 +344,7 @@ export const useGame = create<State>((set, get) => {
     account: null,
     nation: null,
     world: {},
+    claims: {},
     news: [],
     chat: [],
     relays: 0,
@@ -320,369 +353,201 @@ export const useGame = create<State>((set, get) => {
     visit: null,
     lastLandmark: null,
     call: { state: "idle" },
+    caller: null,
     dms: [],
     prices: {},
     phone: false,
     now: Date.now(),
+    skew: 0,
 
     async boot() {
       if (get().booted) return;
-      const cfg = await loadConfig();
-      const season = currentSeason(cfg);
-      const cachedWorld = read<E.PublicNation[]>(LS.world) ?? [];
+      const cached = read<E.PublicNation[]>(LS.world) ?? [];
       const world: Record<string, E.PublicNation> = {};
-      for (const p of cachedWorld) if (p.season === season.id) world[p.id] = p;
-      set({ cfg, season, world, timer: read<Timer>(LS.timer), dms: read(LS_DMS) ?? [], prices: read("bhv:prices") ?? {} });
+      for (const p of cached) world[p.id] = p;
+      set({ world, prices: read("bhv:prices") ?? {} });
       persistStorage();
+      const info = await api<{ googleClientId: string }>("/api/auth/");
+      set({ cfg: { googleClientId: info.googleClientId || "" }, relays: info.ok ? 1 : 0 });
+      token = read<string>(LS.token);
       const acc = read<Account>(LS.account);
-      if (acc) {
+      if (token && acc) {
         set({ account: acc });
-        await afterLogin(acc);
-      } else startNet();
+        await doSync();
+        start();
+        loop();
+      }
       set({ booted: true });
     },
 
     async loginEmail(name, email, pin) {
-      const e = email.trim().toLowerCase();
-      const id = (await sha(`id:${e}:${pin}`)).slice(0, 24);
-      const saveKey = (await sha(`save:${e}:${pin}`)).slice(0, 40);
-      return afterLogin({ id, name: name.trim() || e.split("@")[0], email: e, via: "email", secret: `${e}:${pin}`, saveKey });
+      return signedIn(await api("/api/auth/", { mode: "email", name, email, pin }), "email", email.trim().toLowerCase());
     },
-    async loginGoogle(c) {
-      const id = (await sha(`g:${c.sub}`)).slice(0, 24);
-      const saveKey = (await sha(`gsave:${c.sub}`)).slice(0, 40);
-      return afterLogin({ id, name: c.name, email: c.email, picture: c.picture, via: "google", secret: `g:${c.sub}:${c.email}`, saveKey });
+    async loginGoogle(credential) {
+      return signedIn(await api("/api/auth/", { mode: "google", credential }), "google");
     },
-    loginGuest(name) {
-      const acc: Account = { id: "g" + uid(), name: name.trim() || "Guest", via: "guest" };
-      afterLogin(acc);
+    async loginGuest(name) {
+      return signedIn(await api("/api/auth/", { mode: "guest", name }), "guest");
     },
     logout() {
-      const n = get().nation;
-      if (n) write(LS.nation(n.id), n);
-      cloudSave(true);
+      token = null;
+      write(LS.token, null);
       write(LS.account, null);
-      if (loop) clearInterval(loop);
-      loop = null;
-      set({ account: null, nation: null, visit: null });
+      if (syncTimer) clearTimeout(syncTimer);
+      if (get().call.state !== "idle") caller?.end();
+      set({ account: null, nation: null, visit: null, timer: null });
     },
 
-    found(p) {
-      const { account, season } = get();
-      if (!account || !season) return;
-      const n = E.newNation({ ...p, id: account.id, president: account.name, season }, Date.now());
-      commit(n);
-      startLoop();
-      net?.news({ id: uid(), at: Date.now(), icon: p.flag, text: `${p.flag} ${p.name} was founded in ${p.home.country} by President ${account.name}`, nation: n.id });
-      cloudSave(true);
+    async found(p) {
+      const r = await api<{ me?: E.Nation }>("/api/act/", { a: "found", ...p, president: get().account?.name });
+      if (!r.ok || !r.me) {
+        await doSync();
+        return r.err ?? "Couldn't found your country.";
+      }
+      setNation(r.me);
+      doSync();
+      return null;
     },
 
     log(kind, amount, meta) {
-      const n = get().nation;
-      if (!n) return;
-      const r = E.logActivity(n, kind, amount, Date.now(), meta);
-      commit(r.n);
-      const parts = Object.entries(r.gained).map(([k, v]) => `+${v} ${k}`);
-      if (r.morale) parts.push(`+${r.morale} happiness today`);
-      get().toast({ icon: "✅", title: r.capped ? "Daily limit reached for that one" : `Logged: ${parts.join(" · ")}`, kind: r.capped ? "info" : "good" });
+      const timed = kind === "study" || kind === "workout" || kind === "meditation";
+      run(
+        { a: "log", kind, amount, quality: meta?.quality },
+        (n): E.Result => {
+          if (timed) return E.logManual(n, kind, amount, srvNow());
+          const r = E.logActivity(n, kind, amount, srvNow(), meta);
+          const parts = Object.entries(r.gained).map(([k, v]) => `+${v} ${k}`);
+          if (r.morale) parts.push(`+${r.morale} happiness today`);
+          get().toast({ icon: "✅", title: r.capped ? "Daily limit reached for that one" : `Logged: ${parts.join(" · ")}`, kind: r.capped ? "info" : "good" });
+          return { ok: true, n: r.n };
+        },
+        () => {
+          if (timed) get().toast({ icon: "✅", title: "Logged. Self-reported minutes count up to 60 a day; use the timer for more.", kind: "good" });
+        }
+      );
     },
     startTimer(kind) {
-      const t = { kind, startedAt: Date.now() };
-      write(LS.timer, t);
-      set({ timer: t });
-      const n = get().nation;
-      if (n) commit({ ...n, status: { kind, since: t.startedAt } });
+      run({ a: "timer-start", kind }, (n) => E.startTimer(n, kind, srvNow()));
     },
     stopTimer(save) {
-      const t = get().timer;
-      write(LS.timer, null);
-      set({ timer: null });
-      const n = get().nation;
-      if (n) commit({ ...n, status: null });
-      if (t && save) {
-        const min = Math.floor((Date.now() - t.startedAt) / 60_000);
-        if (min >= 1) get().log(t.kind, min);
-        else get().toast({ icon: "⏱️", title: "Sessions under a minute aren't counted", kind: "info" });
-      }
+      run({ a: "timer-stop", save }, (n) => E.stopTimer(n, save, srvNow()), (r) => {
+        const m = r.minutes ?? 0;
+        if (save) get().toast(m >= 1 ? { icon: "⏱️", title: `${m} minutes saved, timed by the server`, kind: "good" } : { icon: "⏱️", title: "Sessions under a minute aren't counted", kind: "info" });
+      });
     },
     claimGoals() {
-      const n = get().nation;
-      if (!n) return;
-      const r = E.claimGoals(n, Date.now());
-      commit(r.n);
-      if (r.coins) get().toast({ icon: "🎯", title: `Daily goals: +${r.coins} coins`, kind: "good" });
+      run({ a: "goals" }, (n): E.Result => {
+        const r = E.claimGoals(n, srvNow());
+        if (r.coins) get().toast({ icon: "🎯", title: `Daily goals: +${r.coins} coins`, kind: "good" });
+        return { ok: true, n: r.n };
+      });
     },
-    build(t, x, y) {
-      const n = get().nation;
-      if (!n) return false;
-      const r = E.build(n, t, x, y, Date.now());
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      return true;
-    },
-    upgrade(x, y) {
-      const n = get().nation;
-      if (!n) return false;
-      const r = E.upgrade(n, x, y, Date.now());
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      return true;
-    },
-    repair(x, y) {
-      const n = get().nation;
-      if (!n) return false;
-      const r = E.repair(n, x, y);
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      return true;
-    },
-    demolish(x, y) {
-      const n = get().nation;
-      if (!n) return false;
-      const r = E.demolish(n, x, y);
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      return true;
-    },
-    move(from, to) {
-      const n = get().nation;
-      if (!n) return false;
-      const r = E.move(n, from, to, Date.now());
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      return true;
-    },
-    train(count) {
-      const n = get().nation;
-      if (!n) return false;
-      const r = E.train(n, count, Date.now());
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      get().toast({ icon: "🎖️", title: r.msg ?? "Trained", kind: "good" });
-      return true;
-    },
-    research(t) {
-      const n = get().nation;
-      if (!n) return false;
-      const r = E.research(n, t);
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      return true;
-    },
-    setRole(role) {
-      const n = get().nation;
-      if (!n) return false;
-      const r = E.setRole(n, role, Date.now());
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      return true;
-    },
-    bank(op, amt) {
-      const n = get().nation;
-      if (!n) return false;
-      const r = op === "deposit" ? E.deposit(n, amt) : op === "withdraw" ? E.withdraw(n, amt) : op === "borrow" ? E.borrow(n, amt) : E.repay(n, amt);
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      return true;
-    },
+    build: (t, x, y) => run({ a: "build", t, x, y }, (n) => E.build(n, t, x, y, srvNow())),
+    upgrade: (x, y) => run({ a: "upgrade", x, y }, (n) => E.upgrade(n, x, y, srvNow())),
+    repair: (x, y) => run({ a: "repair", x, y }, (n) => E.repair(n, x, y)),
+    demolish: (x, y) => run({ a: "demolish", x, y }, (n) => E.demolish(n, x, y)),
+    move: (f, t) => run({ a: "move", fx: f.x, fy: f.y, tx: t.x, ty: t.y }, (n) => E.move(n, f, t, srvNow())),
+    train: (count) => run({ a: "train", count }, (n) => E.train(n, count, srvNow()), (r) => get().toast({ icon: "🎖️", title: r.msg ?? "Trained", kind: "good" })),
+    research: (t) => run({ a: "research", t }, (n) => E.research(n, t)),
+    setRole: (role) => run({ a: "role", role }, (n) => E.setRole(n, role, srvNow())),
+    bank: (op, amt) => run({ a: "bank", op, amt }, (n) => (op === "deposit" ? E.deposit(n, amt) : op === "withdraw" ? E.withdraw(n, amt) : op === "borrow" ? E.borrow(n, amt) : E.repay(n, amt))),
     sendMoney(to, amt, note) {
-      const n = get().nation;
-      const target = get().pub(to);
-      if (!n || !target || target.ai) return fail("Pick a real country.");
-      const r = E.sendMoney(n, amt, target.name);
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      net?.send(to, { type: "transfer", id: "tx-" + uid(), from: n.id, fromName: `${n.flag} ${n.name}`, amount: Math.floor(amt), note: note?.slice(0, 80), at: Date.now() });
-      get().toast({ icon: "💸", title: `Sent ${Math.floor(amt)} coins to ${target.name}`, kind: "good" });
-      return true;
+      const t = get().pub(to);
+      if (!t || t.ai) return fail("Pick a real country.");
+      return run({ a: "send", to, amt, note }, (n) => E.sendMoney(n, amt, t.name), () => get().toast({ icon: "💸", title: `Sent ${Math.floor(amt)} coins to ${t.name}`, kind: "good" }));
     },
     attack(target, soldiers) {
-      const n = get().nation;
       const tp = get().pub(target);
-      if (!n || !tp) return false;
-      const r = E.launchAttack(n, tp, soldiers, Date.now());
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      if (!tp.ai && r.march) net?.send(target, { type: "march", id: "w-" + r.march.id, from: n.id, fromName: `${n.flag} ${n.name}`, arriveAt: r.march.arriveAt, sent: r.march.sent, at: Date.now() });
-      net?.news({ id: uid(), at: Date.now(), icon: "⚔️", text: `${n.flag} ${n.name} marches ${soldiers} soldiers on ${tp.flag} ${tp.name}`, nation: n.id });
-      get().toast({ icon: "⚔️", title: `Army marching to ${tp.name}`, body: `Arrives ${new Date(r.march!.arriveAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`, kind: "info" });
-      return true;
+      if (!tp) return false;
+      return run({ a: "attack", to: target, soldiers }, (n) => E.launchAttack(n, tp, soldiers, srvNow()), (r) =>
+        get().toast({ icon: "⚔️", title: `Army marching to ${tp.name}`, body: r.march ? `Arrives ${new Date(r.march.arriveAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : undefined, kind: "info" })
+      );
     },
     fly(target) {
-      const n = get().nation;
       const tp = get().pub(target);
-      if (!n || !tp) return false;
-      const r = E.fly(n, tp, Date.now());
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      if (!tp.ai) net?.send(target, { type: "tourist", id: "t-" + uid(), from: n.id, fromName: `${n.flag} ${n.name}`, coins: Math.round((r.ticket ?? 30) * 0.6), at: Date.now() });
-      set({ visit: target });
-      return true;
+      if (!tp) return false;
+      return run({ a: "fly", to: target }, (n) => E.fly(n, tp, srvNow()), () => set({ visit: target }));
     },
     visitLandmark(id) {
-      const n = get().nation;
       const lm = LM_BY_ID.get(id);
-      if (!n || !lm) return false;
-      const r = E.visitLandmark(n, lm, Date.now());
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      set({ lastLandmark: id });
-      net?.news({ id: uid(), at: Date.now(), icon: lm.icon, text: `${n.flag} President ${n.president} of ${n.name} visited ${lm.name}`, nation: n.id });
-      return true;
+      if (!lm) return false;
+      return run({ a: "landmark", id }, (n) => E.visitLandmark(n, lm, srvNow()), () => set({ lastLandmark: id }));
+    },
+    prepare(calId, kind) {
+      return run({ a: "prep", cal: calId, kind }, (n) => E.prepare(n, calId, kind), () => get().toast({ icon: E.PREP[kind].icon, title: `${E.PREP[kind].name}: ready`, body: E.PREP[kind].desc, kind: "good" }));
+    },
+    forecast() {
+      const { nation, season } = get();
+      if (!nation || !season) return [];
+      const now = srvNow();
+      return calamitiesBetween(season, now - DAY, now + 7 * DAY + HOUR)
+        .filter((c) => c.end > now && c.start < now + 7 * DAY + HOUR && hits(c, nation.home))
+        .sort((a, b) => a.start - b.start);
     },
     setPhone(v) {
       set({ phone: v });
     },
     buyShares(id, qty) {
-      const n = get().nation;
       const t = get().pub(id);
-      if (!n || !t) return false;
-      const r = M.buyShares(n, t, qty);
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      if (!t.ai && r.paid) net?.send(id, { type: "invest", id: "iv-" + uid(), from: n.id, fromName: `${n.flag} ${n.name}`, coins: Math.round(r.paid * 0.1), qty: Math.floor(qty), at: Date.now() });
-      get().toast({ icon: "📈", title: `Bought ${Math.floor(qty)} shares of ${t.name}`, kind: "good" });
-      return true;
+      if (!t) return false;
+      return run({ a: "buy", to: id, qty }, (n) => M.buyShares(n, t, qty), () => get().toast({ icon: "📈", title: `Bought ${Math.floor(qty)} shares of ${t.name}`, kind: "good" }));
     },
     sellShares(id, qty) {
-      const n = get().nation;
-      if (!n) return false;
-      const r = M.sellShares(n, get().pub(id), id, qty);
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      get().toast({ icon: "📉", title: `Sold for ${r.got} coins`, kind: "good" });
-      return true;
+      return run({ a: "sell", to: id, qty }, (n) => M.sellShares(n, get().pub(id), id, qty), (r) => get().toast({ icon: "📉", title: `Sold for ${r.got} coins`, kind: "good" }));
     },
     exportGoods(k, qty) {
-      const n = get().nation;
-      if (!n) return false;
-      const r = M.exportGoods(n, k, qty);
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      get().toast({ icon: "🚢", title: `Exported ${Math.floor(qty)} ${k} for ${r.got} coins`, kind: "good" });
-      return true;
+      return run({ a: "export", k, qty }, (n) => M.exportGoods(n, k, qty), (r) => get().toast({ icon: "🚢", title: `Exported ${Math.floor(qty)} ${k} for ${r.got} coins`, kind: "good" }));
     },
     importGoods(k, qty) {
-      const n = get().nation;
-      if (!n) return false;
-      const r = M.importGoods(n, k, qty);
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      get().toast({ icon: "🛳️", title: `Imported ${Math.floor(qty)} ${k} for ${r.paid} coins`, kind: "good" });
-      return true;
+      return run({ a: "import", k, qty }, (n) => M.importGoods(n, k, qty), (r) => get().toast({ icon: "🛳️", title: `Imported ${Math.floor(qty)} ${k} for ${r.paid} coins`, kind: "good" }));
     },
     offerTrade(to, k, qty, price) {
-      const n = get().nation;
       const t = get().pub(to);
-      if (!n || !t || t.ai) return fail("Choose a real country.");
-      const r = M.offerTrade(n, k, qty, price);
-      if (!r.ok) return fail(r.err);
-      commit(r.n);
-      net?.send(to, { type: "trade-offer", id: "to-" + uid(), from: n.id, fromName: `${n.flag} ${n.name}`, res: k, qty: Math.floor(qty), price: Math.floor(price), at: Date.now() });
-      get().toast({ icon: "🚢", title: `Offer sent to ${t.name}`, body: "Goods are held until they answer.", kind: "info" });
-      return true;
+      if (!t || t.ai) return fail("Choose a real country.");
+      return run({ a: "offer", to, k, qty, price }, (n) => M.offerTrade(n, k, qty, price), () => get().toast({ icon: "🚢", title: `Offer sent to ${t.name}`, body: "Goods are held until they answer.", kind: "info" }));
     },
-    answerTrade(offerId, accept) {
-      const n = get().nation;
-      const o = n?.offers?.find((x) => x.id === offerId);
-      if (!n || !o) return;
-      const m = JSON.parse(JSON.stringify(n)) as E.Nation;
-      m.offers = (m.offers ?? []).filter((x) => x.id !== offerId);
-      if (accept) {
-        if (m.res.coins < o.price) return void fail("Not enough coins.");
-        m.res.coins -= o.price;
-        m.res[o.res] += o.qty;
-        m.ledger.unshift({ at: Date.now(), kind: "trade", text: `Imported ${o.qty} ${o.res} from ${o.fromName}`, coins: -o.price });
-        net?.send(o.from, { type: "trade-ok", id: "tk-" + uid(), offer: o.id, from: n.id, fromName: `${n.flag} ${n.name}`, coins: o.price, at: Date.now() });
-      } else net?.send(o.from, { type: "trade-no", id: "tn-" + uid(), offer: o.id, from: n.id, fromName: `${n.flag} ${n.name}`, res: o.res, qty: o.qty, at: Date.now() });
-      commit(m);
+    answerTrade(offer, accept) {
+      run({ a: "answer", offer, accept });
     },
     dm(to, text) {
-      const n = get().nation;
       const t = get().pub(to);
       const msg = text.trim().slice(0, 400);
-      if (!n || !t || !msg) return;
-      const id = "dm-" + uid();
-      net?.send(to, { type: "dm", id, from: n.id, fromName: `${n.flag} ${n.president} (${n.name})`, text: msg, at: Date.now() });
-      const dms = [...get().dms, { id, with: to, withName: `${t.flag} ${t.president} (${t.name})`, mine: true, text: msg, at: Date.now() }].slice(-300);
-      set({ dms });
-      write(LS_DMS, dms);
+      if (!t || !msg) return;
+      set({ dms: [...get().dms, { id: "tmp-" + uid(), with: to, withName: `President ${t.president} (${t.name})`, mine: true, text: msg, at: Date.now() }] });
+      api("/api/act/", { a: "dm", to, text: msg }).then((r) => void (r.ok ? doSync() : fail(r.err ?? "Not sent.")));
     },
-    dial(to) {
+    dial(to, video = false) {
       const t = get().pub(to);
       if (!t || t.ai) return void fail("Centerpoint School never picks up.");
-      caller?.dial(to, `${t.flag} President ${t.president} of ${t.name}`);
+      caller?.dial(to, `President ${t.president} of ${t.name}`, video);
     },
-    acceptCall() {
-      caller?.accept();
-    },
-    declineCall() {
-      caller?.decline();
-    },
-    hangup() {
-      caller?.end();
-    },
-    mute(on) {
-      caller?.mute(on);
-    },
+    acceptCall: (video) => void caller?.accept(video),
+    declineCall: () => caller?.decline(),
+    hangup: () => caller?.end(),
+    mute: (on) => caller?.mute(on),
+    camera: (off) => caller?.camera(off),
+    flipCamera: () => void caller?.flip(),
     endVisit() {
       set({ visit: null });
     },
     ally(target, op) {
-      const n = get().nation;
-      const tp = get().pub(target);
-      if (!n) return;
-      const from = n.id;
-      const fromName = `${n.flag} ${n.name}`;
-      if (op === "request") {
-        if (!tp || tp.ai) return void fail("Centerpoint School doesn't do partnerships!");
-        if (n.partners.length >= 3) return void fail("Max 3 partners.");
-        net?.send(target, { type: "ally-req", id: "ar-" + uid(), from, fromName, at: Date.now() });
-        get().toast({ icon: "🤝", title: `Partnership request sent to ${tp.name}`, kind: "info" });
-      } else if (op === "accept") {
-        const req = n.allyReqs.find((r) => r.id === target);
-        if (!req || n.partners.length >= 3) return;
-        commit({ ...n, allyReqs: n.allyReqs.filter((r) => r.id !== target), partners: [...n.partners, { id: target, name: req.name, since: Date.now() }] });
-        net?.send(target, { type: "ally-ok", id: "ao-" + uid(), from, fromName, at: Date.now() });
-        net?.news({ id: uid(), at: Date.now(), icon: "🤝", text: `${fromName} and ${req.name} formed a partnership`, nation: n.id });
-      } else if (op === "decline") {
-        commit({ ...n, allyReqs: n.allyReqs.filter((r) => r.id !== target) });
-      } else if (op === "end") {
-        commit({ ...n, partners: n.partners.filter((p) => p.id !== target) });
-        net?.send(target, { type: "ally-end", id: "ae-" + uid(), from, fromName, at: Date.now() });
-      }
+      run({ a: "ally", op, to: target });
+      if (op === "request") get().toast({ icon: "🤝", title: "Partnership request sent", kind: "info" });
     },
-    sendAid(target, res) {
+    sendAid(target) {
       const n = get().nation;
       if (!n || !n.partners.some((p) => p.id === target)) return fail("You can only send aid to partners.");
-      const m = JSON.parse(JSON.stringify(n)) as E.Nation;
-      for (const [k, v] of Object.entries(res)) {
-        const key = k as keyof Res;
-        if ((v ?? 0) > m.res[key]) return fail(`Not enough ${k}.`);
-        m.res[key] -= v ?? 0;
-      }
-      commit(m);
-      net?.send(target, { type: "aid", id: "aid-" + uid(), from: n.id, fromName: `${n.flag} ${n.name}`, res, at: Date.now() });
-      get().toast({ icon: "🎁", title: "Aid sent", kind: "good" });
-      return true;
+      return run({ a: "aid", to: target });
     },
     takeCover() {
-      const { nation, season } = get();
-      if (!nation || !season) return;
-      const m = nextMeteor(season, Date.now());
-      if (!m) return;
-      const mins = (m.at - Date.now()) / 60_000;
-      if (mins > COVER_OPEN_MIN) return void fail(`Shelters open ${COVER_OPEN_MIN} minutes before impact.`);
-      commit(E.takeCover(nation, m.id));
-      get().toast({ icon: "🛡️", title: "Your people are in the shelters", body: "Stay safe until the all-clear.", kind: "good" });
+      run({ a: "cover" });
     },
     say(text) {
-      const n = get().nation;
       const t = text.trim().slice(0, 240);
-      if (!n || !t) return;
-      const m: ChatMsg = { id: "c-" + uid(), at: Date.now(), from: n.id, name: `${n.president} (${n.name})`, flag: n.flag, text: t };
-      set((s) => ({ chat: [...s.chat, m].slice(-150) }));
-      net?.chat(m);
+      const n = get().nation;
+      if (!t || !n) return;
+      set((s) => ({ chat: [...s.chat, { id: "tmp-" + uid(), at: Date.now(), from: n.id, name: `President ${n.president} (${n.name})`, flag: n.flag, text: t }] }));
+      api("/api/act/", { a: "chat", text: t }).then((r) => void (r.ok ? doSync() : fail(r.err ?? "Not sent.")));
     },
     toast(t) {
       const id = uid();
