@@ -24,6 +24,11 @@ Both players open the site, pick who they are and enter the same **join code** (
 
 **Optional: your own Supabase.** For a database you control, run `supabase/schema.sql` in a free Supabase project. Then put `supabaseUrl` and `supabaseAnonKey` in `sync-config.json`. When those are set, the app uses Supabase instead of the relays.
 
+## Stay close: notifications, location, records
+- **Notifications** (opt-in during setup or in Settings): you get pinged when your partner cheers, sends a bottle, finishes a long session, wins a medal or completes a build. There's also a gentle evening nudge if you haven't logged anything that day.
+- **Distance** (opt-in): both phones share a location rounded to about 100 m, encrypted, over the same channel. Home shows "📍 1,148 km apart", or "💞 Together!" when you're in the same place. You can turn it off any time.
+- **Saved forever:** every record is stored on the phone (with persistent-storage requested) and in your shared universe. Settings has **Download backup** and **Restore backup**, and `/history` lists every record you've both logged.
+
 ## Install it like an app
 Open the site on your phone:
 - **Android / Chrome:** tap the "Install the app" card on Home, or use Chrome's menu and choose Install.

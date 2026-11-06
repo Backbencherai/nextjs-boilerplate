@@ -13,6 +13,7 @@ import { QuestRow } from "../QuestList";
 import { Logo } from "../Logo";
 import { BuildCard } from "../BuildCard";
 import { InstallCard } from "../InstallCard";
+import { DistanceCard, DeviceSettings } from "./Together";
 
 export function Home() {
   const me = useStore((s) => s.me) as PlayerId;
@@ -129,6 +130,7 @@ export function Home() {
         </div>
       </section>
 
+      <DistanceCard />
       <InstallCard />
       <BuildCard limit={2} />
 
@@ -182,6 +184,9 @@ export function Home() {
             </li>
           ))}
         </ul>
+        <Link href="/history" className="link-btn">
+          all records →
+        </Link>
         {recent.length > 6 && (
           <button className="link-btn" onClick={() => setShowAll(!showAll)}>
             {showAll ? "show less" : "show more"}
@@ -285,6 +290,10 @@ function Settings() {
               ))}
             </ul>
           </div>
+          <DeviceSettings />
+          <Link href="/install" className="btn btn-ghost">
+            📲 Install on another device
+          </Link>
           <button className="btn btn-ghost" onClick={() => confirm(`Switch this device to ${PLAYER_META[partnerOf(me)].name}?`) && switchPlayer()}>
             Switch to {PLAYER_META[partnerOf(me)].name}
           </button>

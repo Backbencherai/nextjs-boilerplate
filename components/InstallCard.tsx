@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type BIP = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
@@ -23,7 +24,7 @@ export function InstallCard() {
     window.addEventListener("axd-installable", on);
     return () => window.removeEventListener("axd-installable", on);
   }, []);
-  if (hidden || (!canPrompt && !ios)) return null;
+  if (hidden) return null;
   const dismiss = () => {
     try {
       localStorage.setItem("adxd:installDismissed", "1");
@@ -38,6 +39,9 @@ export function InstallCard() {
           ✕
         </button>
       </div>
+      <Link href="/install" className="link-btn small">
+        all devices & share with your partner →
+      </Link>
       {canPrompt ? (
         <>
           <p className="small">Put A×D on your home screen. It opens full-screen like a real app and works offline.</p>
@@ -54,10 +58,12 @@ export function InstallCard() {
             Install
           </button>
         </>
-      ) : (
+      ) : ios ? (
         <p className="small">
           On iPhone: tap <b>Share</b> <span aria-hidden>⎋</span> in Safari, then <b>Add to Home Screen</b>. It opens full-screen like a real app.
         </p>
+      ) : (
+        <p className="small">Put A×D on your home screen or desktop. It opens in its own window like a real app and works offline.</p>
       )}
     </section>
   );

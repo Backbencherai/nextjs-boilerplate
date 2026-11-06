@@ -40,7 +40,15 @@ export function WorldPage() {
       setReadAt(localStorage.getItem(NOTES_READ) || "");
     } catch {}
     const t = setTimeout(() => setHint(false), 7000);
-    return () => clearTimeout(t);
+    // iOS Safari ignores user-scalable for pinch; stop zoom gestures from fighting the game controls
+    const stop = (e: Event) => e.preventDefault();
+    document.addEventListener("gesturestart", stop);
+    document.addEventListener("gesturechange", stop);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("gesturestart", stop);
+      document.removeEventListener("gesturechange", stop);
+    };
   }, []);
 
   const partner = partnerOf(me);

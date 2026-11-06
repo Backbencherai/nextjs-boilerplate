@@ -10,8 +10,10 @@ import { Crowd } from "../three/Crowd";
 import { Trophy } from "../three/Trophy";
 import { Bridge, Coin, Flower, House, Island, Tree, FocusCrystal } from "../three/props";
 import { useStore } from "@/lib/store";
+import { LogoMark } from "../LogoMark";
 import { hashSpace, cloudConfigured } from "@/lib/sync/backend";
 import { PLAYER_META, type PlayerId } from "@/lib/types";
+import { notifyGranted, notifySupported, geoSupported } from "@/lib/device";
 
 /* ───────────────────────── shared bits ───────────────────────── */
 
@@ -97,6 +99,13 @@ export function Loader({ onDone }: { onDone: () => void }) {
 
   return (
     <motion.div className="loader" exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
+      <div className="loader-logo">
+        <LogoMark size={104} animated />
+        <p>
+          <span style={{ color: PLAYER_META.adarsh.color }}>ADARSH</span> <span style={{ color: "#c98f06" }}>♥</span>{" "}
+          <span style={{ color: PLAYER_META.devanshi.color }}>DEWANSHI</span>
+        </p>
+      </div>
       <div className="loader-stage">
         <Canvas shadows camera={{ position: [0, 1.4, 3.6], fov: 38 }} dpr={[1, 2]}>
           <PaperLights />
@@ -192,7 +201,9 @@ export function Landing({ onStart, onStory, returning }: { onStart: () => void; 
           </button>
         </div>
       </div>
-      <p className="landing-foot">a private universe for two · poke anyone you see</p>
+      <p className="landing-foot">
+        a private universe for two · <a href="/install/">install the app 📲</a>
+      </p>
     </motion.div>
   );
 }
@@ -388,7 +399,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
               </Canvas>
             }
           >
-            <p className="story-count">1 of 3</p>
+            <p className="story-count">1 of 4</p>
             <h2 className="display story-title">Who are you?</h2>
             <p className="story-body">Pick who&apos;s holding this phone. Your partner picks the other one on theirs.</p>
             <div className="pick-row">
@@ -420,7 +431,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
               </Canvas>
             }
           >
-            <p className="story-count">2 of 3</p>
+            <p className="story-count">2 of 4</p>
             <h2 className="display story-title">Join code</h2>
             <p className="story-body">
               You both enter the <b>same join code</b> on your own phones, anywhere in the world, and you&apos;re in one live multiplayer universe. Everything is encrypted with it.
@@ -447,7 +458,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             </div>
           </Card>
         )}
-        {step === 2 && (
+        {step === 2 && <PermissionsCard onNext={() => setStep(3)} />}
+        {step === 3 && (
           <Card
             key="how"
             illo={
@@ -459,7 +471,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
               </Canvas>
             }
           >
-            <p className="story-count">3 of 3</p>
+            <p className="story-count">4 of 4</p>
             <h2 className="display story-title">How it works</h2>
             <ul className="how-list">
               <li>
@@ -481,5 +493,72 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         )}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+/* Step 3: stay close — notifications + location (both optional, both ask the OS properly). */
+function PermissionsCard({ onNext }: { onNext: () => void }) {
+  const enableNotifications = useStore((s) => s.enableNotifications);
+  const enableLocation = useStore((s) => s.enableLocation);
+  const [notif, setNotif] = useState<"idle" | "on" | "off">(notifyGranted() ? "on" : "idle");
+  const [loc, setLoc] = useState<"idle" | "on" | "off" | "busy">("idle");
+  const ios = typeof navigator !== "undefined" && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const standalone = typeof window !== "undefined" && (window.matchMedia("(display-mode: standalone)").matches || !!(navigator as unknown as { standalone?: boolean }).standalone);
+  return (
+    <Card
+      key="perm"
+      illo={
+        <Canvas shadows camera={{ position: [0, 0.4, 4.2], fov: 40 }} dpr={[1, 2]}>
+          <PickScene who={null} />
+        </Canvas>
+      }
+    >
+      <p className="story-count">3 of 4</p>
+      <h2 className="display story-title">Stay close</h2>
+      <p className="story-body">Get a ping when your partner cheers or wins something, and see how far apart you are.</p>
+      <div className="stack">
+        <div className="perm-row">
+          <span style={{ fontSize: 26 }}>🔔</span>
+          <div className="grow">
+            <b>Notifications</b>
+            <small>{!notifySupported() ? (ios && !standalone ? "On iPhone, install the app first (Share → Add to Home Screen)." : "Not supported in this browser.") : "Cheers, bottles, medals, builds, a gentle daily nudge."}</small>
+          </div>
+          {notif === "on" ? (
+            <span className="ok">✓ On</span>
+          ) : (
+            <button className="btn btn-primary sm" disabled={!notifySupported()} onClick={async () => setNotif((await enableNotifications()) ? "on" : "off")}>
+              {notif === "off" ? "Blocked" : "Allow"}
+            </button>
+          )}
+        </div>
+        <div className="perm-row">
+          <span style={{ fontSize: 26 }}>📍</span>
+          <div className="grow">
+            <b>Location</b>
+            <small>Only to show the distance between you two. Rounded to about 100 m, encrypted, shared with no one else.</small>
+          </div>
+          {loc === "on" ? (
+            <span className="ok">✓ On</span>
+          ) : (
+            <button
+              className="btn btn-primary sm"
+              disabled={!geoSupported() || loc === "busy"}
+              onClick={async () => {
+                setLoc("busy");
+                setLoc((await enableLocation()) ? "on" : "off");
+              }}
+            >
+              {loc === "busy" ? "…" : loc === "off" ? "Blocked" : "Allow"}
+            </button>
+          )}
+        </div>
+      </div>
+      <p className="small muted center">You can change both any time in Settings.</p>
+      <div className="row gap center">
+        <button className="btn btn-primary" onClick={onNext}>
+          {notif === "on" || loc === "on" ? "Next" : "Maybe later"}
+        </button>
+      </div>
+    </Card>
   );
 }

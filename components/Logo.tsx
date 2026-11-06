@@ -1,9 +1,10 @@
 "use client";
 import { useRef, useState } from "react";
 import { useStore } from "@/lib/store";
+import { LogoMark } from "./LogoMark";
 
 /** The A×D mark. It is ticklish: seven quick taps reveal a secret. */
-export function Logo({ size = 40 }: { size?: number }) {
+export function Logo({ size = 46 }: { size?: number }) {
   const taps = useRef<number[]>([]);
   const [wiggle, setWiggle] = useState(0);
   const findSecret = useStore((s) => s.findSecret);
@@ -23,12 +24,7 @@ export function Logo({ size = 40 }: { size?: number }) {
         }
       }}
     >
-      <svg viewBox="0 0 40 40" width={size} height={size} aria-hidden>
-        <rect x="1.5" y="1.5" width="37" height="37" rx="11" fill="#fbfaf6" stroke="#14140f" strokeWidth="2.5" />
-        <path d="M8 29 L14 11 L20 29 M10.5 23 H17.5" stroke="#1b120c" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M19 17 L23 21 M23 17 L19 21" stroke="#c0342a" strokeWidth="2.6" strokeLinecap="round" />
-        <path d="M24 11 H27 C33 11 34 16 34 20 C34 24 33 29 27 29 H24 Z" stroke="#1b120c" strokeWidth="3" fill="none" strokeLinejoin="round" />
-      </svg>
+      <LogoMark size={size} />
     </button>
   );
 }

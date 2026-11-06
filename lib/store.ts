@@ -4,7 +4,8 @@ import { PLAYER_META, partnerOf, type Activity, type ActivityKind, type PlayerId
 import { xpFor } from "./game/xp";
 import { computeUniverse, type Universe } from "./game/stats";
 import { ACH_BY_ID } from "./game/achievements";
-import { makeBackend, readCache, writeCache, type Backend, type WorldPos } from "./sync/backend";
+import { makeBackend, readCache, writeCache, type Backend, type GeoLoc, type WorldPos } from "./sync/backend";
+import { askLocation, askNotifications, geoPermission, notify, persistStorage, roundCoord } from "./device";
 import { loadSyncConfig } from "./sync/config";
 import { buildStates } from "./game/builds";
 import { SECRETS } from "./game/secrets";
@@ -54,8 +55,16 @@ interface State {
   toasts: Toast[];
   night: boolean;
   devConsole: boolean;
+  shareLoc: boolean;
+  myLoc: GeoLoc | null;
+  partnerLoc: GeoLoc | null;
+  persisted: boolean;
 
   hydrate(): void;
+  enableNotifications(): Promise<boolean>;
+  enableLocation(): Promise<boolean>;
+  disableLocation(): void;
+  importActivities(list: Activity[]): number;
   setIdentity(me: PlayerId, space: string): void;
   switchPlayer(): void;
   markIntroSeen(): void;
@@ -86,10 +95,11 @@ const uid = () =>
       });
 
 let backend: Backend | null = null;
+let geoWatch: number | null = null;
 let disconnect: (() => void) | null = null;
 
 const PREF = "adxd:prefs";
-type Prefs = { me?: PlayerId; space?: string; introSeen?: boolean; timer?: Timer | null; night?: boolean };
+type Prefs = { me?: PlayerId; space?: string; introSeen?: boolean; timer?: Timer | null; night?: boolean; shareLoc?: boolean; partnerLoc?: GeoLoc | null };
 const readPrefs = (): Prefs => {
   try {
     return JSON.parse(localStorage.getItem(PREF) || "{}");
@@ -134,12 +144,14 @@ export const useStore = create<State>((set, get) => {
           get().celebrate({ kind: "achievement", title: def.name, subtitle: def.desc, who, achId: id });
         } else {
           get().toast({ icon: def.icon, text: `${PLAYER_META[who].name} unlocked ${def.name}`, color: PLAYER_META[who].color });
+          notify(`${def.icon} ${PLAYER_META[who].name} won ${def.name}`, def.desc, "medal-" + id);
         }
       });
     }
     const before = new Set(buildStates(prev).filter((b) => b.done).map((b) => b.def.id));
     for (const b of buildStates(u)) {
       if (!b.done || before.has(b.def.id)) continue;
+      notify(`🔨 ${b.def.name} is built!`, "A new part of your world is ready. Go and see it.", "build-" + b.def.id);
       get().celebrate({
         kind: "build",
         title: b.def.name,
@@ -168,14 +180,24 @@ export const useStore = create<State>((set, get) => {
       .then((all) => apply(all, false))
       .catch(() => get().toast({ icon: "⚠️", text: "Offline — showing saved data. Changes will sync later." }))
       .finally(() => set({ ready: true }));
+    const myLoc = get().myLoc;
+    if (myLoc && get().shareLoc) setTimeout(() => backend?.sendLoc?.(myLoc), 2500);
     disconnect = backend.connect(me, {
       onInsert: (a) => {
         if (get().activities.some((x) => x.id === a.id)) return;
         apply([...get().activities, a], true);
         const myself = get().me;
         if (a.player !== myself) {
-          if (a.kind === "cheer") get().toast({ icon: "💛", text: `${PLAYER_META[a.player].name} cheered you on!`, color: PLAYER_META[a.player].color });
-          else if (a.kind === "note") get().toast({ icon: "🍾", text: `${PLAYER_META[a.player].name} sent a bottle to your shore`, color: PLAYER_META[a.player].color });
+          const nm = PLAYER_META[a.player].name;
+          if (a.kind === "cheer") {
+            get().toast({ icon: "💛", text: `${nm} cheered you on!`, color: PLAYER_META[a.player].color });
+            notify(`💛 ${nm} cheered you on!`, "Open A×D and cheer back.", "cheer");
+          } else if (a.kind === "note") {
+            get().toast({ icon: "🍾", text: `${nm} sent a bottle to your shore`, color: PLAYER_META[a.player].color });
+            notify(`🍾 A bottle from ${nm}`, String(a.data.text ?? "").slice(0, 120), "note");
+          } else if (["study", "workout", "meditation"].includes(a.kind) && (a.minutes ?? 0) >= 20) {
+            notify(`${nm} just finished ${Math.round(a.minutes ?? 0)} min of ${a.kind}`, "Your turn? Every minute builds your bridge.", "activity");
+          }
         }
       },
       onDelete: (id) => apply(
@@ -184,6 +206,11 @@ export const useStore = create<State>((set, get) => {
       ),
       onPresence: (online) => set({ online }),
       onPos: (p) => p.player !== get().me && set({ partnerPos: p }),
+      onLoc: (l) => {
+        if (l.player === get().me) return;
+        set({ partnerLoc: l });
+        writePrefs({ partnerLoc: l });
+      },
       onResync: (all) => {
         // server is the source of truth; keep only very fresh local rows still in flight
         const ids = new Set(all.map((a) => a.id));
@@ -210,16 +237,64 @@ export const useStore = create<State>((set, get) => {
     toasts: [],
     night: false,
     devConsole: false,
+    shareLoc: false,
+    myLoc: null,
+    partnerLoc: null,
+    persisted: false,
 
     hydrate() {
       const p = readPrefs();
-      set({ me: p.me ?? null, space: p.space ?? null, introSeen: !!p.introSeen, timer: p.timer ?? null, night: !!p.night });
+      set({ me: p.me ?? null, space: p.space ?? null, introSeen: !!p.introSeen, timer: p.timer ?? null, night: !!p.night, shareLoc: !!p.shareLoc, partnerLoc: p.partnerLoc ?? null });
+      // keep everything saved: ask the browser to never clear our storage
+      persistStorage().then((ok) => set({ persisted: ok }));
+      // resume location sharing silently if it was on and still permitted
+      if (p.shareLoc) geoPermission().then((st) => st === "granted" && get().enableLocation());
       // read sync settings first so the right backend (cloud or local) is chosen
       loadSyncConfig().finally(() => {
         set({ hydrated: true });
         if (p.me && p.space) connect();
         else set({ ready: true });
       });
+    },
+    async enableNotifications() {
+      const ok = await askNotifications();
+      if (ok) notify("🔔 Notifications are on", "We'll tell you when your partner cheers, sends a bottle or wins something.", "hello", true);
+      return ok;
+    },
+    async enableLocation() {
+      const pos = await askLocation();
+      if (!pos) {
+        set({ shareLoc: false });
+        writePrefs({ shareLoc: false });
+        return false;
+      }
+      const me = get().me;
+      const send = (p: GeolocationPosition) => {
+        if (!me) return;
+        const l: GeoLoc = { player: me, lat: roundCoord(p.coords.latitude), lon: roundCoord(p.coords.longitude), acc: Math.round(p.coords.accuracy), at: Date.now() };
+        const prev = get().myLoc;
+        set({ myLoc: l });
+        if (!prev || prev.lat !== l.lat || prev.lon !== l.lon || Date.now() - prev.at > 10 * 60_000) backend?.sendLoc?.(l);
+      };
+      send(pos);
+      set({ shareLoc: true });
+      writePrefs({ shareLoc: true });
+      if (geoWatch === null && navigator.geolocation) geoWatch = navigator.geolocation.watchPosition(send, () => {}, { enableHighAccuracy: false, maximumAge: 120000, timeout: 30000 });
+      return true;
+    },
+    disableLocation() {
+      if (geoWatch !== null) navigator.geolocation.clearWatch(geoWatch);
+      geoWatch = null;
+      set({ shareLoc: false, myLoc: null });
+      writePrefs({ shareLoc: false });
+    },
+    importActivities(list) {
+      const known = new Set(get().activities.map((a) => a.id));
+      const fresh = list.filter((a) => a && a.id && a.player && a.kind && a.at && !known.has(a.id));
+      if (!fresh.length) return 0;
+      apply([...get().activities, ...fresh], false);
+      for (const a of fresh) backend?.insert(a);
+      return fresh.length;
     },
     setIdentity(me, space) {
       writePrefs({ me, space });

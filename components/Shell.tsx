@@ -49,6 +49,43 @@ export function Shell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("beforeinstallprompt", onPrompt);
   }, []);
 
+  // home-screen shortcuts: /?quick=study | workout | water
+  const ready = useStore((s) => s.ready);
+  useEffect(() => {
+    if (!ready || !me) return;
+    const q = new URLSearchParams(location.search).get("quick");
+    if (!q) return;
+    history.replaceState(null, "", location.pathname);
+    const st = useStore.getState();
+    if (q === "water") {
+      st.log("water", { data: { glasses: 1 } });
+      st.toast({ icon: "💧", text: "Glass logged from your home screen · +3 XP" });
+    } else if (q === "study" || q === "workout") st.openSheet("timer", q);
+  }, [ready, me]);
+
+  // gentle evening nudge if nothing real was logged today (fires while the app is open/backgrounded)
+  useEffect(() => {
+    if (!me) return;
+    const check = () => {
+      const now = new Date();
+      if (now.getHours() < 19) return;
+      const key = "adxd:nudged:" + now.toDateString();
+      try {
+        if (localStorage.getItem(key)) return;
+      } catch {}
+      const s = useStore.getState();
+      const active = s.universe.players[me].activeDays.has(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`);
+      if (active) return;
+      try {
+        localStorage.setItem(key, "1");
+      } catch {}
+      import("@/lib/device").then((d) => d.notify("🌱 Your island misses you", "Log one small thing today to keep your streak alive.", "nudge", true));
+    };
+    check();
+    const iv = setInterval(check, 15 * 60_000);
+    return () => clearInterval(iv);
+  }, [me]);
+
   // Konami code → developer console
   useEffect(() => {
     const seq = ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright", "b", "a"];
@@ -68,7 +105,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const onboarded = !!me && !!space && introSeen;
   useEffect(() => {
-    if (pathname !== "/" && useStore.getState().me === null && booted.current) {
+    if (pathname !== "/" && !pathname.startsWith("/install") && useStore.getState().me === null && booted.current) {
       const t = setTimeout(() => {
         const s = useStore.getState();
         if (!s.me || !s.space) router.replace("/");

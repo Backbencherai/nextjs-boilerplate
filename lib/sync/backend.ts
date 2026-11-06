@@ -15,7 +15,16 @@ export interface WorldPos {
   t: number;
 }
 
+export interface GeoLoc {
+  player: PlayerId;
+  lat: number;
+  lon: number;
+  acc: number;
+  at: number;
+}
+
 export interface Handlers {
+  onLoc?: (l: GeoLoc) => void;
   onInsert: (a: Activity) => void;
   onDelete: (id: string) => void;
   onPresence: (online: PlayerId[]) => void;
@@ -30,6 +39,7 @@ export interface Backend {
   remove(id: string): Promise<void>;
   connect(me: PlayerId, h: Handlers): () => void;
   sendPos(p: WorldPos): void;
+  sendLoc?(l: GeoLoc): void;
 }
 
 export async function hashSpace(code: string): Promise<string> {
@@ -184,6 +194,7 @@ class CloudBackend implements Backend {
     ch.on("broadcast", { event: "act" }, ({ payload }) => h.onInsert(payload as Activity))
       .on("broadcast", { event: "del" }, ({ payload }) => h.onDelete((payload as { id: string }).id))
       .on("broadcast", { event: "pos" }, ({ payload }) => h.onPos(payload as WorldPos))
+      .on("broadcast", { event: "loc" }, ({ payload }) => h.onLoc?.(payload as GeoLoc))
       .on("presence", { event: "sync" }, () => {
         const state = ch.presenceState();
         h.onPresence(Object.keys(state) as PlayerId[]);
@@ -216,6 +227,10 @@ class CloudBackend implements Backend {
     this.lastPos = now;
     this.channel?.send({ type: "broadcast", event: "pos", payload: p });
   }
+
+  sendLoc(l: GeoLoc) {
+    this.channel?.send({ type: "broadcast", event: "loc", payload: l });
+  }
 }
 
 /* ───────────────────────── Local (this device) ───────────────────────── */
@@ -245,6 +260,7 @@ class LocalBackend implements Backend {
       if (m.t === "act") h.onInsert(m.a);
       else if (m.t === "del") h.onDelete(m.id);
       else if (m.t === "pos") h.onPos(m.p);
+      else if (m.t === "loc") h.onLoc?.(m.l);
       else if (m.t === "hb") {
         seen.set(m.player, Date.now());
       }
@@ -270,6 +286,9 @@ class LocalBackend implements Backend {
     if (now - this.lastPos < 100) return;
     this.lastPos = now;
     this.bc?.postMessage({ t: "pos", p });
+  }
+  sendLoc(l: GeoLoc) {
+    this.bc?.postMessage({ t: "loc", l });
   }
 }
 

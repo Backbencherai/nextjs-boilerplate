@@ -11,7 +11,7 @@
  * - Several relays are used at once; whichever is up wins. Messages are de-duplicated by id.
  */
 import type { Activity, PlayerId } from "../types";
-import type { Backend, Handlers, WorldPos } from "./backend";
+import type { Backend, GeoLoc, Handlers, WorldPos } from "./backend";
 import { readCache } from "./backend";
 
 export const DEFAULT_RELAYS = ["wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt"];
@@ -196,6 +196,9 @@ export class RelayBackend implements Backend {
               this.online.set(p.player, Date.now());
               h.onPos(p);
             }
+          } else if (rest.startsWith("loc/")) {
+            const l = await this.open<GeoLoc>(msg);
+            if (l && l.player !== me) h.onLoc?.(l);
           } else if (rest.startsWith("on/")) {
             const who = rest.slice(3) as PlayerId;
             if (who === me) return;
@@ -245,6 +248,12 @@ export class RelayBackend implements Backend {
     if (now - this.lastPos < 150 || !this.key) return;
     this.lastPos = now;
     this.seal(p).then((s) => this.pub(`${this.root}/pos/${p.player}`, s));
+  }
+
+  /** Location is retained (encrypted), so the partner sees the last known spot even if you're offline. */
+  async sendLoc(l: GeoLoc) {
+    await this.ready;
+    this.pub(`${this.root}/loc/${l.player}`, await this.seal(l), true);
   }
 
   /** Number of relays currently connected (for the status badge). */

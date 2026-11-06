@@ -17,6 +17,7 @@
     "framer-motion": "^12.38.0",
     "mqtt": "^5.10.4",
     "next": "^15.5.29",
+    "qrcode-generator": "^1.4.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "three": "^0.180.0",
