@@ -61,9 +61,12 @@ function Landing({ onPlay }: { onPlay: () => void }) {
         </Canvas>
       </div>
       <div className="landing-copy">
-        <Logo size={74} animated />
-        <h1 className="title-xl">
-          BHAVAN&apos;S<span className="s">MULTIPLAYER</span>
+        <div className="land-emblem">
+          <Logo size={104} />
+        </div>
+        <h1 className="land-title">
+          <span className="t1">BHAVAN&apos;S</span>
+          <span className="t2">MULTIPLAYER</span>
         </h1>
         <p className="tag">Build a country with your real life. Study, train, eat well and drink water to grow a city, then trade, travel, ally and go to war with players everywhere.</p>
         <button className="btn saffron lg" onClick={onPlay}>

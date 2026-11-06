@@ -34,7 +34,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     boot();
-    const t = setTimeout(() => setIntro(false), 1700);
+    const t = setTimeout(() => setIntro(false), 4300);
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
     const onPrompt = (e: Event) => {
       e.preventDefault();
@@ -54,11 +54,24 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="app">
       <AnimatePresence>
         {(intro || !booted) && (
-          <motion.div className="loader" key="loader" exit={{ opacity: 0 }} transition={{ duration: 0.35 }}>
-            <Logo size={132} animated />
-            <p>
-              BHAVAN&apos;S <span style={{ color: "#1f3a93" }}>MULTIPLAYER</span>
-            </p>
+          <motion.div className="loader cine" key="loader" exit={{ opacity: 0, scale: 1.04 }} transition={{ duration: 0.6, ease: "easeInOut" }} onClick={() => setIntro(false)}>
+            <div className="cine-rays" />
+            <div className="cine-motes">
+              {Array.from({ length: 18 }).map((_, i) => (
+                <i key={i} style={{ left: `${(i * 37) % 100}%`, animationDelay: `${(i % 6) * 0.45}s`, animationDuration: `${5 + (i % 4)}s` }} />
+              ))}
+            </div>
+            <div className="cine-emblem">
+              <Logo size={210} animated />
+            </div>
+            <h1 className="cine-title">
+              <span className="t1">
+                <span>BHAVAN&apos;S</span>
+              </span>
+              <span className="t2">MULTIPLAYER</span>
+            </h1>
+            <div className="cine-line" />
+            <p className="cine-tag">Knowledge is nectar · Build your nation</p>
           </motion.div>
         )}
       </AnimatePresence>

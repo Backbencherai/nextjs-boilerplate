@@ -1,5 +1,5 @@
 /* Bhavan's Multiplayer service worker: installable + offline. */
-const VERSION = "bhv-v2";
+const VERSION = "bhv-v3";
 const CORE = ["/", "/city/", "/world/", "/war/", "/bank/", "/ranks/", "/me/", "/install/", "/manifest.webmanifest", "/icon-192.png", "/models/world.glb"];
 self.addEventListener("install", (e) => e.waitUntil(caches.open(VERSION).then((c) => c.addAll(CORE).catch(() => {})).then(() => self.skipWaiting())));
 self.addEventListener("activate", (e) => e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim())));
