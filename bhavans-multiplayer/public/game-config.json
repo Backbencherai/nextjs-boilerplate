@@ -1,0 +1,6 @@
+{
+  "world": "global",
+  "relays": ["wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt"],
+  "seasonStart": "2026-11-06T00:00:00Z",
+  "googleClientId": ""
+}
