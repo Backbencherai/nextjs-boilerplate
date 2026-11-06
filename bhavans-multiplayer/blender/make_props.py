@@ -272,7 +272,7 @@ def broadleaf():
     shade_leaves(co, 0.55, 0.3)
     cb = bmesh.new()
     uvl = cb.loops.layers.uv.new("UVMap")
-    uv_quad_cards(cb, uvl, on_blobs(blobs, 150), 0.75)
+    uv_quad_cards(cb, uvl, on_blobs(blobs, 260), 0.6)
     cr = obj_from_bm("TreeBroad_Crown", cb, mat("leafcard", "#ffffff", 0.8))
     shade_leaves(cr, 1.0, 0.5)
     return group("TreeBroad", [t, co, cr])
@@ -353,6 +353,10 @@ def furn(name, parts):
         o = obj_from_bm(f"{name}_{mname}", bm, mat(f"f_{mname}", hexc, rough))
         if bev:
             bevel_mod(o, bev, 3)
+        if mname in ("Fabric", "Cushion", "Sheet", "Blanket", "Pillow"):
+            ss = o.modifiers.new("soft", "SUBSURF")
+            ss.levels = 1
+            ss.render_levels = 1
         objs.append(o)
     return group(name, objs)
 
@@ -445,14 +449,27 @@ def bookshelf():
 
 def plant():
     bm = bmesh.new()
-    cyl(bm, Vector((0, 0, 0.2)), 0.18, 0.4, "z", 16, 0.22)
+    cyl(bm, Vector((0, 0, 0.2)), 0.18, 0.4, "z", 20, 0.22)
     pot = obj_from_bm("Plant_Pot", bm, mat("pot", "#c7664a", 0.8))
+    sb = bmesh.new()
+    tips = []
+    for k in range(9):
+        a = k / 9 * math.pi * 2 + random.random() * 0.4
+        h = random.uniform(0.6, 1.15)
+        lean = random.uniform(0.15, 0.4)
+        tip = Vector((math.cos(a) * lean, math.sin(a) * lean, h))
+        mid = tip * 0.5 + Vector((0, 0, 0.38))
+        d = tip - Vector((0, 0, 0.38))
+        rot = Vector((0, 0, 1)).rotation_difference(d.normalized()).to_matrix().to_4x4()
+        bmesh.ops.create_cone(sb, cap_ends=True, segments=5, radius1=0.012, radius2=0.008, depth=d.length, matrix=Matrix.Translation(mid) @ rot)
+        tips.append((tip, 0.3))
+    stems = obj_from_bm("Plant_Stem", sb, mat("stem", "#4f7a3a", 0.8))
     lb = bmesh.new()
-    for c, r in [((0, 0, 0.75), 0.32), ((0.15, 0.1, 0.95), 0.24), ((-0.12, -0.1, 0.98), 0.22)]:
-        displaced_blob(lb, Vector(c), r, 0.35, 4, 2)
-    lv = obj_from_bm("Plant_Crown", lb, mat("leaves", "#ffffff", 0.85))
-    shade_leaves(lv, 1, 0.5)
-    return group("Plant", [pot, lv])
+    uvl = lb.loops.layers.uv.new("UVMap")
+    uv_quad_cards(lb, uvl, tips, 0.26, 0.8)
+    lv = obj_from_bm("Plant_Crown", lb, mat("leafcard", "#ffffff", 0.8))
+    shade_leaves(lv, 1, 0.6)
+    return group("Plant", [pot, stems, lv])
 
 
 def lamp():

@@ -119,6 +119,7 @@ export interface Nation {
   allyReqs: { id: string; name: string; at: number }[];
   stamps: { id: string; name: string; at: number }[];
   gear?: string[];
+  reports?: { key: string; n: number };
   done: string[];
   ledger: Ledger[];
   log: { at: number; kind: ActKind; amount: number; note?: string }[];
@@ -1209,4 +1210,17 @@ export function payFare(n0: Nation, mode: Ride, km: number, now: number): Result
   n.res.coins -= fare;
   pushLedger(n, { at: now, kind: "travel", text: `${RIDE_NAME[mode]} ride, ${d.toFixed(1)} km`, coins: -fare });
   return { ok: true, n, fare };
+}
+
+/** Report an emergency you witnessed (accident, theft, medical). Up to 3 rewarded reports a day. */
+export function reportIncident(n0: Nation, kind: string, now: number): Result {
+  const key = dayKey(now);
+  const used = n0.reports?.key === key ? n0.reports.n : 0;
+  const n = clone(n0);
+  n.reports = { key, n: used + 1 };
+  if (used >= 3) return { ok: true, n, msg: "Thanks for reporting. (Daily civic reward already earned.)" };
+  n.res.coins += 15;
+  n.happiness = Math.min(100, n.happiness + 2);
+  pushLedger(n, { at: now, kind: "civic", text: `Reported a ${kind} to emergency services`, coins: 15 });
+  return { ok: true, n, msg: "+15 coins and +2% happiness: good citizen!" };
 }

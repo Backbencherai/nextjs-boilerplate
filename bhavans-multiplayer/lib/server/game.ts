@@ -363,6 +363,9 @@ export async function act(id: string, b: Body): Promise<{ ok: boolean; err?: str
         r = E.payFare(n, mode as E.Ride, N(b.km), now);
         break;
       }
+      case "report":
+        r = E.reportIncident(n, S(b.kind).slice(0, 20), now);
+        break;
       case "gear": {
         r = E.buyGear(n, S(b.item), now);
         break;

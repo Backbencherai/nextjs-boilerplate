@@ -19,6 +19,7 @@ import * as E from "@/lib/game/engine";
 import type { CharId } from "@/lib/game/rules";
 import { rng, calamitiesBetween, hits } from "@/lib/game/world";
 import { Animals } from "./Animals";
+import { Incidents, Soundscape, emergencyNumber, life, setMuted, sound, speak } from "./Life";
 import { Prop, useParts } from "./props";
 import { Apartment, FURNITURE, ROOM } from "./Apartment";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
@@ -167,6 +168,28 @@ export function Roam() {
     }
   });
   const [lightsOn, setLightsOn] = useState(true);
+  const [muted, setMute] = useState(!sound.on);
+  const [call, setCall] = useState<"" | "dial" | "talk" | "sent">("");
+  const report = useGame((s) => s.report);
+  const sos = emergencyNumber(place.country);
+  const dial = () => {
+    setCall("dial");
+    setTimeout(() => {
+      setCall("talk");
+      speak(`${sos}, what's your emergency?`);
+    }, 1800);
+  };
+  const answer = (kind: "accident" | "theft" | "medical" | "fire") => {
+    const inc = life.incident;
+    const real = inc && !inc.reported && inc.kind === kind;
+    if (real) {
+      inc!.reported = true;
+      report(kind);
+      speak(kind === "theft" ? "Police are on the way. Don't put yourself in danger. Can you describe the suspect?" : "An ambulance and police are on the way to your location. Stay on the line and keep safe.");
+    } else speak(inc ? "Thank you. Units are already responding nearby." : "We have no reports in your area. Please only call for real emergencies.");
+    setCall("sent");
+    setTimeout(() => setCall(""), 3500);
+  };
   const outside = useRef<[number, number] | null>(null);
   const enter = () => {
     outside.current = [tel.current.x, tel.current.z];
@@ -270,6 +293,8 @@ export function Roam() {
         camera={{ fov: 60, near: 0.2, far: 2400, position: [0, 6, 80] }}
         {...gestureHandlers()}
       >
+        <Soundscape tel={tel as unknown as React.RefObject<{ x: number; z: number; speed: number; ride: string | null }>} env={inside ? "indoor" : style.env} night={hour < 6 || hour >= 19} ride={isRide(mode) ? mode : null} indoors={inside} />
+        {!inside && <Incidents tel={tel} env={style.env} onChange={() => bump((x) => x + 1)} />}
         {inside ? (
           <>
             <EnvLight intensity={0.35} />
@@ -298,6 +323,12 @@ export function Roam() {
             </div>
           )}
         </div>
+        <button className="hud-chip" onClick={() => (setMuted(!muted), setMute(!muted))} aria-label="Sound">
+          {muted ? "🔇" : "🔊"}
+        </button>
+        <button className="hud-chip sos" onClick={dial} aria-label={`Call ${sos}`}>
+          🚨 {sos}
+        </button>
         {cfg?.mapsKey && (
           <a className="hud-chip" href={`/explore/?lm=${place.id.replace(/^lm:/, "")}`} title="Real 3D (Google)">
             🌐
@@ -380,6 +411,39 @@ export function Roam() {
         </button>
       </div>
       <Stick />
+      {life.incident && !inside && (
+        <div className={`xp-incident ${life.incident.done ? "done" : ""}`}>
+          {life.incident.done === "caught"
+            ? "🦹 You caught the thief! The bag is back with its owner."
+            : life.incident.done === "escaped"
+              ? "🦹 The thief got away… report it so police can search."
+              : life.incident.done === "helped"
+                ? "✅ Help has arrived. Thank you for calling!"
+                : life.incident.kind === "accident"
+                  ? `💥 Car crash at the crossing ${Math.round(Math.hypot(life.incident.x - t.x, life.incident.z - t.z))} m away!`
+                  : life.incident.kind === "theft"
+                    ? "🦹 Thief! Someone snatched a bag. Chase them (Run) or call the police!"
+                    : `🚑 Someone has collapsed ${Math.round(Math.hypot(life.incident.x - t.x, life.incident.z - t.z))} m away!`}
+          {!life.incident.reported && life.incident.done !== "caught" && life.incident.done !== "helped" && <button onClick={dial}>📞 Call {sos}</button>}
+        </div>
+      )}
+      {call && (
+        <div className="xp-call">
+          <div className="xp-call-card">
+            <b className="display" style={{ fontSize: 36 }}>{sos}</b>
+            <span>{call === "dial" ? "Calling emergency services…" : call === "talk" ? "Operator: “What's your emergency?”" : "Help is on the way."}</span>
+            {call === "talk" && (
+              <div className="grid2" style={{ width: "100%" }}>
+                <button className="btn" onClick={() => answer("accident")}>💥 Car accident</button>
+                <button className="btn" onClick={() => answer("theft")}>🦹 Theft / robbery</button>
+                <button className="btn" onClick={() => answer("medical")}>🚑 Medical</button>
+                <button className="btn" onClick={() => answer("fire")}>🔥 Fire</button>
+              </div>
+            )}
+            <button className="btn red" onClick={() => setCall("")}>End call</button>
+          </div>
+        </div>
+      )}
       {inside ? (
         <div className="xp-door">
           <button onClick={leave}>🚪 Leave the apartment</button>
@@ -519,7 +583,7 @@ function World({ spawn, india, style, sky, deco, fight, monument, label, hour, m
       {monument && (night || deco.size > 0) && monument !== "fountain" && <LightShow radius={MONUMENT_RADIUS[monument] ?? 12} />}
       <Throwables me={tel} fight={fight} />
       <Animals me={tel} env={style.env} india={india} season={style.season ?? "summer"} night={night} />
-      {style.env === "beach" && <Ocean z={OCEAN_Z + 1300} night={night} sun={sun} />}
+      {style.env === "beach" && <Ocean z={OCEAN_Z + 700} night={night} sun={sun} storm={sky === "typhoon" ? 1.2 : sky === "storm" ? 0.6 : sky === "tsunami" ? 0.4 : 0} shore={OCEAN_Z} />}
       <Ground style={style} tel={tel} wet={sky === "rain" || sky === "storm" || sky === "typhoon"} />
       {chunks.map((c) => (
         <ChunkMesh key={c.key} c={c} style={style} night={night} />
@@ -531,6 +595,8 @@ function World({ spawn, india, style, sky, deco, fight, monument, label, hour, m
       <Plaza style={style} monument={monument} night={night} />
       {style.snow && <Snowcaps monument={monument} />}
       <Traffic style={style} tel={tel} night={night} />
+      {style.env !== "forest" && <Signals tel={tel} style={style} />}
+      <Police tel={tel} style={style} />
       <People tel={tel} style={style} />
       <Clouds />
       <Player spawn={spawn ?? undefined} mode={mode} view={view} character={character} tel={tel} boxes={boxes} monumentR={monument ? MONUMENT_RADIUS[monument] ?? 12 : 0} style={style} onChunk={(c) => (c[0] !== center[0] || c[1] !== center[1]) && setCenter(c)} />
@@ -815,6 +881,23 @@ function buildChunk(c: Chunk, style: CityStyle) {
         const xx = x0 + s;
         if (!(inPlazaX && Math.abs(zz) < 100) && !(style.env === "beach" && zz > OCEAN_Z - 40)) slab(rx, zz + 2, 0.25, 4, 0.03, "#f6f1e3");
         if (!(inPlazaZ && Math.abs(xx) < 100) && !(style.env === "beach" && rz > OCEAN_Z - 40)) slab(xx + 2, rz, 4, 0.25, 0.03, "#f6f1e3");
+      }
+  // zebra crossings on every approach to every crossing
+  if (style.env !== "forest")
+    for (let i = 0; i < CHUNK; i++)
+      for (let j = 0; j < CHUNK; j++) {
+        const ix = x0 + i * CELL;
+        const iz = z0 + j * CELL;
+        if ((Math.abs(ix) <= 100 && Math.abs(iz) <= 100) || (style.env === "beach" && iz > OCEAN_Z - 50)) continue;
+        for (const sd of [1, -1]) {
+          for (let k = -3; k <= 3; k++) {
+            slab(ix + k * 1.6, iz + sd * (ROAD / 2 + 1.6), 0.8, 2.6, 0.035, "#f6f1e3");
+            slab(ix + sd * (ROAD / 2 + 1.6), iz + k * 1.6, 2.6, 0.8, 0.035, "#f6f1e3");
+          }
+          // stop lines
+          slab(ix + sd * (ROAD / 2 + 3.2), iz - sd * 3.4, 0.35, ROAD / 2, 0.035, "#ffffff");
+          slab(ix + sd * 3.4, iz - sd * (ROAD / 2 + 3.2), ROAD / 2, 0.35, 0.035, "#ffffff");
+        }
       }
   const sg = new THREE.BufferGeometry();
   sg.setAttribute("position", new THREE.Float32BufferAttribute(S, 3));
@@ -1236,16 +1319,159 @@ function Clouds() {
 
 /* ───── traffic: cartoon cars on every street around you ───── */
 const CAR_COLS = ["#e74c3c", "#3498db", "#f1c40f", "#2ecc71", "#ffffff", "#9b59b6", "#e67e22", "#34495e", "#1abc9c", "#f78fb3"];
-function Traffic({ style, tel, night }: { style: CityStyle; tel: React.RefObject<Tel>; night: boolean }) {
-  const N = style.env === "forest" ? 6 : 38;
+/* ───── traffic lights: a shared 24 s cycle; cars along x and along z take turns ───── */
+const CYCLE = 24;
+export function signalFor(alongX: boolean, time = performance.now() / 1000): "green" | "yellow" | "red" {
+  const u = time % CYCLE;
+  if (alongX) return u < 10 ? "green" : u < 12 ? "yellow" : "red";
+  return u < 12 ? "red" : u < 22 ? "green" : "yellow";
+}
+const inPlaza = (x: number, z: number) => Math.abs(x) <= 100 && Math.abs(z) <= 100;
+
+function Signals({ tel, style }: { tel: React.RefObject<Tel>; style: CityStyle }) {
+  const R = 3; // intersections around you in each direction
+  const n = (2 * R + 1) ** 2 * 4;
+  const pole = useRef<THREE.InstancedMesh>(null);
+  const head = useRef<THREE.InstancedMesh>(null);
+  const lamp = useRef<THREE.InstancedMesh>(null);
+  const last = useRef({ key: "", phase: "" });
+  const m = useMemo(() => new THREE.Matrix4(), []);
+  const q = useMemo(() => new THREE.Quaternion(), []);
+  const col = useMemo(() => new THREE.Color(), []);
+  const up = useMemo(() => new THREE.Vector3(0, 1, 0), []);
+  useFrame(() => {
+    const t = tel.current!;
+    const cx = Math.round(t.x / CELL);
+    const cz = Math.round(t.z / CELL);
+    const now = performance.now() / 1000;
+    const phase = signalFor(true, now) + signalFor(false, now);
+    const key = `${cx},${cz}`;
+    if (key === last.current.key && phase === last.current.phase) return;
+    last.current = { key, phase };
+    let k = 0;
+    const off = ROAD / 2 + 0.9;
+    for (let i = -R; i <= R; i++)
+      for (let j = -R; j <= R; j++) {
+        const ix = (cx + i) * CELL;
+        const iz = (cz + j) * CELL;
+        const skip = inPlaza(ix, iz) || (style.env === "beach" && iz > OCEAN_Z - 50) || style.env === "forest";
+        // four corner poles; two face traffic along x, two face traffic along z
+        for (const [sx, sz, alongX] of [
+          [1, 1, true],
+          [-1, -1, true],
+          [-1, 1, false],
+          [1, -1, false],
+        ] as [number, number, boolean][]) {
+          const px = skip ? 0 : ix + sx * off;
+          const pz = skip ? 0 : iz + sz * off;
+          const y = skip ? -100 : 0;
+          const rot = alongX ? (sx > 0 ? -Math.PI / 2 : Math.PI / 2) : sz > 0 ? 0 : Math.PI;
+          q.setFromAxisAngle(up, rot);
+          m.compose(new THREE.Vector3(px, y + 2.4, pz), q, new THREE.Vector3(1, 1, 1));
+          pole.current!.setMatrixAt(k, m);
+          m.compose(new THREE.Vector3(px, y + 4.3, pz), q, new THREE.Vector3(1, 1, 1));
+          head.current!.setMatrixAt(k, m);
+          const state = signalFor(alongX, now);
+          const fwd = new THREE.Vector3(0, 0, 0.2).applyQuaternion(q);
+          ["red", "yellow", "green"].forEach((c, li) => {
+            m.makeTranslation(px + fwd.x, y + 4.75 - li * 0.45, pz + fwd.z);
+            lamp.current!.setMatrixAt(k * 3 + li, m);
+            const on = c === state;
+            lamp.current!.setColorAt(k * 3 + li, col.set(on ? (c === "red" ? "#ff2a2a" : c === "yellow" ? "#ffc21a" : "#27e05a") : "#2a2a2e").multiplyScalar(on ? 2.2 : 1));
+          });
+          k++;
+        }
+      }
+    for (const im of [pole, head, lamp]) {
+      im.current!.instanceMatrix.needsUpdate = true;
+      im.current!.computeBoundingSphere();
+    }
+    if (lamp.current!.instanceColor) lamp.current!.instanceColor.needsUpdate = true;
+  });
+  return (
+    <>
+      <instancedMesh ref={pole} args={[undefined, undefined, n]} castShadow frustumCulled={false}>
+        <cylinderGeometry args={[0.09, 0.11, 4.8, 8]} />
+        <meshStandardMaterial color="#3b4150" metalness={0.6} roughness={0.4} />
+      </instancedMesh>
+      <instancedMesh ref={head} args={[undefined, undefined, n]} frustumCulled={false}>
+        <boxGeometry args={[0.42, 1.45, 0.34]} />
+        <meshStandardMaterial color="#1b1d22" roughness={0.5} />
+      </instancedMesh>
+      <instancedMesh ref={lamp} args={[undefined, undefined, n * 3]} frustumCulled={false}>
+        <sphereGeometry args={[0.14, 12, 8]} />
+        <meshBasicMaterial toneMapped={false} />
+      </instancedMesh>
+    </>
+  );
+}
+
+/** A traffic police officer on a podium at the nearest crossing, waving cars through. */
+function Police({ tel, style }: { tel: React.RefObject<Tel>; style: CityStyle }) {
+  const g = useRef<THREE.Group>(null);
+  const [anim, setAnim] = useState<Anim>("cheer");
+  useFrame(() => {
+    const t = tel.current!;
+    let cx = Math.round(t.x / CELL) * CELL;
+    let cz = Math.round(t.z / CELL) * CELL;
+    if (inPlaza(cx, cz)) cz = (cz >= 0 ? 3 : -3) * CELL;
+    if (style.env === "beach" && cz > OCEAN_Z - 50) cz = Math.floor((OCEAN_Z - 60) / CELL) * CELL;
+    if (g.current) g.current.position.set(cx, 0, cz);
+    const want: Anim = signalFor(true) === "green" ? "cheer" : "interact";
+    if (want !== anim) setAnim(want);
+    if (g.current) g.current.rotation.y = signalFor(true) === "green" ? Math.PI / 2 : 0;
+  });
+  if (style.env === "forest") return null;
+  return (
+    <group ref={g}>
+      <mesh position={[0, 0.35, 0]} castShadow>
+        <cylinderGeometry args={[0.9, 1, 0.7, 20]} />
+        <meshStandardMaterial color="#f4f1ea" />
+      </mesh>
+      <mesh position={[0, 0.36, 0]}>
+        <cylinderGeometry args={[0.92, 1.02, 0.18, 20]} />
+        <meshStandardMaterial color="#d23a3a" />
+      </mesh>
+      <mesh position={[0, 1.9, 0]}>
+        <cylinderGeometry args={[1.1, 1.1, 0.06, 20]} />
+        <meshStandardMaterial color="#f4f1ea" side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[0, 1.1, 0]}>
+        <cylinderGeometry args={[0.04, 0.04, 1.5, 6]} />
+        <meshStandardMaterial color="#888" />
+      </mesh>
+      <group position={[0, 0.7, 0]}>
+        <Hero character="knight" anim={anim} height={1.75} />
+        {/* hi-vis vest */}
+        <mesh position={[0, 1.0, 0]}>
+          <cylinderGeometry args={[0.3, 0.28, 0.45, 12, 1, true]} />
+          <meshStandardMaterial color="#d6ff2a" emissive="#9acd00" emissiveIntensity={0.25} side={THREE.DoubleSide} />
+        </mesh>
+      </group>
+      {[0, 1, 2, 3].map((i) => (
+        <mesh key={i} position={[Math.cos((i * Math.PI) / 2) * 2, 0.35, Math.sin((i * Math.PI) / 2) * 2]}>
+          <coneGeometry args={[0.22, 0.7, 12]} />
+          <meshStandardMaterial color="#ff6a00" />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function Traffic({ style, tel }: { style: CityStyle; tel: React.RefObject<Tel>; night?: boolean }) {
+  const N = style.env === "forest" ? 6 : 40;
   const parts = useParts("Car");
   const refs = useRef<(THREE.InstancedMesh | null)[]>([]);
-  const cars = useMemo(() => Array.from({ length: N }, (_, i) => ({ axis: i % 2, line: 0, dir: 1, t: 0, speed: 9 + (i % 5) * 2.5, init: false, color: CAR_COLS[i % CAR_COLS.length] })), [N]);
+  const heads = useRef<THREE.InstancedMesh>(null);
+  const bodies = useRef<THREE.InstancedMesh>(null);
+  const cars = useMemo(() => Array.from({ length: N }, (_, i) => ({ axis: i % 2, line: 0, dir: 1, t: 0, v: 0, cruise: 9 + (i % 5) * 2.2, init: false, color: CAR_COLS[i % CAR_COLS.length] })), [N]);
   const m = useMemo(() => new THREE.Matrix4(), []);
+  const m2 = useMemo(() => new THREE.Matrix4(), []);
   const q = useMemo(() => new THREE.Quaternion(), []);
   const v = useMemo(() => new THREE.Vector3(), []);
   const one = useMemo(() => new THREE.Vector3(1, 1, 1), []);
   const up = useMemo(() => new THREE.Vector3(0, 1, 0), []);
+  const seat = useMemo(() => [new THREE.Matrix4().makeTranslation(-0.38, 1.12, 0.15), new THREE.Matrix4().makeTranslation(-0.38, 0.8, 0.2)], []);
   useEffect(() => {
     const c = new THREE.Color();
     parts.forEach((p, k) => {
@@ -1254,6 +1480,12 @@ function Traffic({ style, tel, night }: { style: CityStyle; tel: React.RefObject
       cars.forEach((car, i) => im.setColorAt(i, c.set(car.color)));
       if (im.instanceColor) im.instanceColor.needsUpdate = true;
     });
+    cars.forEach((_, i) => {
+      heads.current?.setColorAt(i, c.setHSL(0.07, 0.45, 0.35 + (i % 4) * 0.1));
+      bodies.current?.setColorAt(i, c.setHSL((i * 0.17) % 1, 0.5, 0.45));
+    });
+    if (heads.current?.instanceColor) heads.current.instanceColor.needsUpdate = true;
+    if (bodies.current?.instanceColor) bodies.current.instanceColor.needsUpdate = true;
   }, [cars, parts]);
   const respawn = (car: (typeof cars)[number], px: number, pz: number, r: () => number) => {
     const base = car.axis ? pz : px;
@@ -1263,12 +1495,14 @@ function Traffic({ style, tel, night }: { style: CityStyle; tel: React.RefObject
     car.dir = r() < 0.5 ? 1 : -1;
     const along = car.axis ? px : pz;
     car.t = along + (r() - 0.5) * 500;
+    car.v = car.cruise;
     car.init = true;
   };
   useFrame((_, dtRaw) => {
     const dt = Math.min(0.05, dtRaw);
     const t = tel.current!;
     const r = Math.random;
+    const now = performance.now() / 1000;
     cars.forEach((car, i) => {
       if (!car.init) respawn(car, t.x, t.z, r);
       const along = car.axis ? t.x : t.z;
@@ -1276,21 +1510,38 @@ function Traffic({ style, tel, night }: { style: CityStyle; tel: React.RefObject
       const lane = car.dir * 3.4;
       let x = car.axis ? car.t : car.line + lane;
       let z = car.axis ? car.line - lane : car.t;
-      // stop for the player standing in front
+      let target = car.cruise;
+      // 1) traffic lights: brake to the stop line on yellow/red
+      const next = car.dir > 0 ? Math.ceil((car.t + 0.5) / CELL) * CELL : Math.floor((car.t - 0.5) / CELL) * CELL;
+      const stop = next - car.dir * (ROAD / 2 + 3);
+      const dStop = (stop - car.t) * car.dir;
+      const cross = car.axis ? inPlaza(next, car.line) : inPlaza(car.line, next);
+      const light = signalFor(car.axis === 1, now);
+      if (!cross && light !== "green" && dStop > -0.5 && dStop < 28 && !(light === "yellow" && dStop < 4)) target = Math.min(target, Math.max(0, dStop) * 0.55);
+      // 2) keep a safe gap to the car in front
+      for (const o of cars) {
+        if (o === car || o.axis !== car.axis || o.line !== car.line || o.dir !== car.dir) continue;
+        const gap = (o.t - car.t) * car.dir;
+        if (gap > 0 && gap < 22) target = Math.min(target, Math.max(0, (gap - 6.5) * 0.7));
+      }
+      // 3) stop for you
       const ahead = car.axis ? (t.x - x) * car.dir : (t.z - z) * car.dir;
       const side = car.axis ? Math.abs(t.z - z) : Math.abs(t.x - x);
-      const blocked = ahead > 0 && ahead < 9 && side < 2.2;
-      if (!blocked) car.t += car.dir * car.speed * dt;
+      if (ahead > 0 && ahead < 10 && side < 2.3) target = 0;
+      car.v += (target - car.v) * Math.min(1, dt * (target < car.v ? 3.5 : 1.2));
+      car.t += car.dir * car.v * dt;
       // keep out of the monument plaza and the sea
-      if (Math.abs(car.axis ? car.line : car.line) < 100 && Math.abs(car.t) < 100) car.t += car.dir * 200;
+      if (Math.abs(car.line) < 100 && Math.abs(car.t) < 100) car.t += car.dir * 200;
       if (style.env === "beach" && (car.axis ? car.line : car.t) > OCEAN_Z - 40) respawn(car, t.x, Math.min(t.z, OCEAN_Z - 200), r);
       x = car.axis ? car.t : car.line + lane;
       z = car.axis ? car.line - lane : car.t;
       q.setFromAxisAngle(up, car.axis ? (car.dir > 0 ? -Math.PI / 2 : Math.PI / 2) : car.dir > 0 ? Math.PI : 0);
       m.compose(v.set(x, 0, z), q, one);
       for (const im of refs.current) im?.setMatrixAt(i, m);
+      heads.current?.setMatrixAt(i, m2.multiplyMatrices(m, seat[0]));
+      bodies.current?.setMatrixAt(i, m2.multiplyMatrices(m, seat[1]));
     });
-    for (const im of refs.current) {
+    for (const im of [...refs.current, heads.current, bodies.current]) {
       if (!im) continue;
       im.instanceMatrix.needsUpdate = true;
       im.computeBoundingSphere();
@@ -1301,6 +1552,15 @@ function Traffic({ style, tel, night }: { style: CityStyle; tel: React.RefObject
       {parts.map((p, k) => (
         <instancedMesh key={p.name} ref={(el) => void (refs.current[k] = el)} args={[p.geo, p.mat, N]} castShadow={p.paint} frustumCulled={false} />
       ))}
+      {/* the people driving */}
+      <instancedMesh ref={heads} args={[undefined, undefined, N]} frustumCulled={false}>
+        <sphereGeometry args={[0.13, 12, 10]} />
+        <meshStandardMaterial roughness={0.7} />
+      </instancedMesh>
+      <instancedMesh ref={bodies} args={[undefined, undefined, N]} frustumCulled={false}>
+        <boxGeometry args={[0.38, 0.42, 0.26]} />
+        <meshStandardMaterial roughness={0.8} />
+      </instancedMesh>
     </>
   );
 }
@@ -1326,7 +1586,12 @@ function People({ tel, style }: { tel: React.RefObject<Tel>; style: CityStyle })
         p.t = along + (Math.random() - 0.5) * 220;
         p.init = true;
       }
-      p.t += p.dir * p.sp * dt;
+      // wait at the kerb for the walk signal, then cross on the zebra
+      const nextRoad = p.dir > 0 ? Math.ceil(p.t / CELL) * CELL : Math.floor(p.t / CELL) * CELL;
+      const kerb = nextRoad - p.dir * (ROAD / 2 + 0.6);
+      const dk = (kerb - p.t) * p.dir;
+      const waiting = dk > 0 && dk < 0.9 && signalFor(p.axis === 1) !== "green" && !inPlaza(p.axis ? nextRoad : p.line, p.axis ? p.line : nextRoad);
+      if (!waiting) p.t += p.dir * p.sp * dt;
       const off = p.side * (ROAD / 2 + 1.4);
       const x = p.axis ? p.t : p.line + off;
       const z = p.axis ? p.line + off : p.t;

@@ -1761,3 +1761,11 @@ label.f {
 
 .xp-door { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(204px + var(--safe-b)); z-index: 5; display: flex; gap: 8px; }
 .xp-door button { background: #fff; border: 2px solid #16161d; border-radius: 999px; padding: 9px 16px; font: inherit; font-weight: 900; cursor: pointer; box-shadow: 2px 3px 0 #0004; white-space: nowrap; }
+
+.hud-chip.sos { background: #d23a3a; color: #fff; font-weight: 900; border: 2px solid #16161d; }
+.xp-incident { position: absolute; left: 50%; transform: translateX(-50%); top: calc(110px + var(--safe-t)); z-index: 6; background: #16161d; color: #fff; border-radius: 14px; padding: 10px 14px; font-weight: 800; display: flex; gap: 10px; align-items: center; max-width: min(560px, 92vw); box-shadow: 0 6px 20px #0006; animation: pulse 1.6s infinite; }
+.xp-incident.done { animation: none; background: #138808; }
+.xp-incident button { background: #d23a3a; color: #fff; border: 0; border-radius: 999px; padding: 6px 12px; font: inherit; font-weight: 900; cursor: pointer; white-space: nowrap; }
+.xp-call { position: absolute; inset: 0; z-index: 30; background: #000a; display: grid; place-items: center; }
+.xp-call-card { background: #16161d; color: #fff; border-radius: 24px; padding: 22px; width: min(380px, 92vw); display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.xp-call-card .btn:not(.red) { color: #16161d; font-weight: 800; }

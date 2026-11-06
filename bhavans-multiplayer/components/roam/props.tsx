@@ -97,6 +97,60 @@ export function frondTex() {
     }
   });
 }
+export function fabricTex() {
+  return canvasTex("fabric", (g, S) => {
+    g.fillStyle = "#e9e9e9";
+    g.fillRect(0, 0, S, S);
+    for (let y = 0; y < S; y += 2)
+      for (let x = 0; x < S; x += 2) {
+        const v = 215 + Math.floor(rnd() * 40) - ((x + y) % 4 === 0 ? 18 : 0);
+        g.fillStyle = `rgb(${v},${v},${v})`;
+        g.fillRect(x, y, 2, 2);
+      }
+  });
+}
+export function barkTex() {
+  return canvasTex("bark", (g, S) => {
+    g.fillStyle = "#cfc3b4";
+    g.fillRect(0, 0, S, S);
+    for (let i = 0; i < 90; i++) {
+      const x = rnd() * S;
+      const w = 2 + rnd() * 6;
+      const shade = 70 + Math.floor(rnd() * 70);
+      g.fillStyle = `rgba(${shade},${shade * 0.85},${shade * 0.7},0.75)`;
+      g.beginPath();
+      g.moveTo(x, 0);
+      for (let y = 0; y <= S; y += 16) g.lineTo(x + Math.sin(y * 0.05 + i) * 4, y);
+      g.lineTo(x + w, S);
+      g.lineTo(x + w, 0);
+      g.fill();
+    }
+  });
+}
+/** Box/cylinder projection UVs for meshes exported without them (furniture, trunks). */
+function projectUVs(geo: THREE.BufferGeometry, scale = 1.2, cylindrical = false) {
+  const pos = geo.getAttribute("position");
+  const nor = geo.getAttribute("normal");
+  const uv = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    if (cylindrical) {
+      uv[i * 2] = (Math.atan2(z, x) / (Math.PI * 2) + 0.5) * 2;
+      uv[i * 2 + 1] = y * 0.6;
+      continue;
+    }
+    const ax = Math.abs(nor ? nor.getX(i) : 0);
+    const ay = Math.abs(nor ? nor.getY(i) : 1);
+    const az = Math.abs(nor ? nor.getZ(i) : 0);
+    if (ay >= ax && ay >= az) uv.set([x * scale, z * scale], i * 2);
+    else if (ax >= az) uv.set([z * scale, y * scale], i * 2);
+    else uv.set([x * scale, y * scale], i * 2);
+  }
+  geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+}
+
 export function woodTex() {
   return canvasTex("wood", (g, S) => {
     for (let i = 0; i < 8; i++) {
@@ -141,7 +195,7 @@ export function useParts(root: string): Part[] {
         mat.vertexColors = !!geo.getAttribute("color");
         mat.side = THREE.DoubleSide;
         mat.flatShading = false;
-        const card = /Crown/.test(mesh.name) && !/Plant/.test(mesh.name);
+        const card = /Crown/.test(mesh.name);
         if (card) {
           (mat as THREE.MeshStandardMaterial).map = /Pine/.test(mesh.name) ? needleTex() : /Palm/.test(mesh.name) ? frondTex() : leafTex();
           mat.alphaTest = 0.45;
@@ -161,6 +215,30 @@ export function useParts(root: string): Part[] {
         mat.vertexColors = true;
       }
       if (/Light|Tail/.test(mesh.name)) (mat as THREE.MeshStandardMaterial).toneMapped = false;
+      // real surface textures on furniture and trunks
+      const sm = mat as THREE.MeshStandardMaterial;
+      if (/_(Fabric|Cushion|Sheet|Blanket|Pillow|Rug)/.test(mesh.name)) {
+        if (!geo.getAttribute("uv")) projectUVs(geo, 3);
+        sm.map = fabricTex();
+        sm.map.wrapS = sm.map.wrapT = THREE.RepeatWrapping;
+      } else if (/_(Wood|Chair|Cabinet)/.test(mesh.name) && !/Car|Bus/.test(mesh.name)) {
+        if (!geo.getAttribute("uv")) projectUVs(geo, 1.6);
+        const w = woodTex();
+        w.wrapS = w.wrapT = THREE.RepeatWrapping;
+        sm.map = w;
+        sm.color.multiplyScalar(1.6);
+      } else if (/Trunk/.test(mesh.name)) {
+        if (!geo.getAttribute("uv")) projectUVs(geo, 1, true);
+        const b = barkTex();
+        b.wrapS = b.wrapT = THREE.RepeatWrapping;
+        sm.map = b;
+      }
+      if (/Glass/.test(mesh.name)) {
+        mat.transparent = true;
+        mat.opacity = 0.45; // see the people inside
+        (mat as THREE.MeshStandardMaterial).roughness = 0.05;
+        (mat as THREE.MeshStandardMaterial).metalness = 0.6;
+      }
       out.push({ name: mesh.name, geo, mat, paint, leaves });
     });
     return out;

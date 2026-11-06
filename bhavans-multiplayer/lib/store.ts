@@ -98,6 +98,7 @@ interface State {
   forecast(): Calamity[];
   payFare(mode: E.Ride, km: number): boolean;
   buyGear(item: string): boolean;
+  report(kind: string): boolean;
   call: CallState;
   caller: Caller | null;
   dms: DM[];
@@ -493,6 +494,9 @@ export const useGame = create<State>((set, get) => {
     },
     payFare(mode, km) {
       return run({ a: "fare", mode, km }, (n) => E.payFare(n, mode, km, srvNow()), (r) => get().toast({ icon: "🎟️", title: `${E.RIDE_NAME[mode]}: paid ${r.fare} coins`, kind: "info" }));
+    },
+    report(kind) {
+      return run({ a: "report", kind }, (n) => E.reportIncident(n, kind, srvNow()), (r) => get().toast({ icon: "🚓", title: r.msg ?? "Reported", kind: "good" }));
     },
     buyGear(item) {
       return run({ a: "gear", item }, (n) => E.buyGear(n, item, srvNow()), (r) => get().toast({ icon: "🛍️", title: r.msg ?? "Bought", kind: "good" }));

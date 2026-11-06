@@ -84,6 +84,15 @@ Tap **🧭 Roam** in the menu. You get an endless cartoon city with towers, stre
 - **Nature:** bird flocks, pigeons that scatter, street dogs, cows in Indian cities, deer in forests and snow, dolphins and gulls at the beach, butterflies in spring.
 - **Every country** in the world is searchable in Roam.
 
+### Everyday life
+- **Traffic lights** at every crossing (one shared cycle), zebra crossings and stop lines. Cars brake for red, queue behind each other and stop for you. You can see the drivers through the glass.
+- Pedestrians wait at the kerb for the walk signal, and a **traffic police officer** in a hi-vis vest directs traffic from a podium.
+- **Incidents** happen near you: car crashes (smoke, glass), bag thieves you can chase down, and people collapsing.
+  - Call the real local emergency number (🚨 112 / 911 / 999 / 000…). A spoken operator answers, then police cars and ambulances race in with sirens and flashing lights.
+  - Up to 3 reports a day earn a civic reward (server-checked).
+- **Sound everywhere** (🔊 to mute), all generated in the browser: breaking waves at beaches, city traffic hum, horns, birdsong, footsteps, your engine, sirens, rain and thunder, fireworks.
+- **The ocean** is a real rolling sea: Gerstner swells, fresnel sky reflections, sun glints and whitecaps. It gets rougher in storms.
+
 ## Multiplayer
 - `app/api/auth`: sign-in (email + PIN, Google, or name only).
 - `app/api/sync`: each phone checks in about every 3 seconds (about every second during a call). The server advances your country, resolves battles and delivers news, chat, messages, raids, trades and call signals.

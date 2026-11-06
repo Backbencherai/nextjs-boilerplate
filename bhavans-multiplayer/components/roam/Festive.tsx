@@ -4,7 +4,6 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { Water } from "three/examples/jsm/objects/Water.js";
 import type { Deco } from "@/lib/game/festivals";
 
 /* round soft sprite for every particle (instead of square points) */
@@ -76,26 +75,110 @@ export function PoolMat({ color = "#2f7fb0", scale = 6, speed = 1 }: { color?: s
   return <primitive object={m} attach="material" />;
 }
 
-export function Ocean({ z, size = 2600, night, sun }: { z: number; size?: number; night: boolean; sun: [number, number, number] }) {
-  const water = useMemo(() => {
-    const w = new Water(new THREE.PlaneGeometry(size, size), {
-      textureWidth: 512,
-      textureHeight: 512,
-      waterNormals: waterNormals(),
-      sunDirection: new THREE.Vector3(...sun).normalize(),
-      sunColor: night ? 0x445577 : 0xfff4e0,
-      waterColor: night ? 0x061a2a : 0x0f5e7a,
-      distortionScale: 3.4,
-      fog: true,
-    });
-    w.rotation.x = -Math.PI / 2;
-    (w.material as THREE.ShaderMaterial).uniforms.size.value = 6;
-    return w;
-  }, [size, night, sun]);
+/** A real rolling sea: Gerstner swells moved on the GPU, fresnel sky reflection, sun glints and whitecaps. */
+const OCEAN_VS = /* glsl */ `
+uniform float uTime;
+uniform float uStorm;
+varying vec3 vPos;
+varying vec3 vNormal;
+varying float vCrest;
+#include <fog_pars_vertex>
+vec3 gerstner(vec4 w, vec3 p, inout vec3 tangent, inout vec3 binormal) {
+  float steep = min(0.34, w.z * (1.0 + uStorm * 0.45));
+  float k = 6.28318 / w.w;
+  float c = sqrt(9.8 / k);
+  vec2 d = normalize(w.xy);
+  float f = k * (dot(d, p.xz) - c * uTime);
+  float a = steep / k;
+  tangent += vec3(-d.x * d.x * (steep * sin(f)), d.x * (steep * cos(f)), -d.x * d.y * (steep * sin(f)));
+  binormal += vec3(-d.x * d.y * (steep * sin(f)), d.y * (steep * cos(f)), -d.y * d.y * (steep * sin(f)));
+  return vec3(d.x * (a * cos(f)), a * sin(f), d.y * (a * cos(f)));
+}
+void main() {
+  vec4 wp = modelMatrix * vec4(position, 1.0);
+  vec3 p = wp.xyz;
+  vec3 tangent = vec3(1.0, 0.0, 0.0);
+  vec3 binormal = vec3(0.0, 0.0, 1.0);
+  vec3 off = vec3(0.0);
+  off += gerstner(vec4(0.0, -1.0, 0.22, 46.0), p, tangent, binormal);
+  off += gerstner(vec4(0.3, -1.0, 0.18, 27.0), p, tangent, binormal);
+  off += gerstner(vec4(-0.4, -1.0, 0.14, 15.0), p, tangent, binormal);
+  off += gerstner(vec4(0.8, -0.6, 0.1, 8.0), p, tangent, binormal);
+  // swells shrink to nothing at the shoreline
+  float shore = smoothstep(0.0, 60.0, p.z - ${"${SHORE}"});
+  p += off * shore;
+  vCrest = off.y * shore;
+  vNormal = normalize(mix(vec3(0.0, 1.0, 0.0), normalize(cross(binormal, tangent)), shore));
+  vPos = p;
+  vec4 mv = viewMatrix * vec4(p, 1.0);
+  gl_Position = projectionMatrix * mv;
+  vec4 mvPosition = mv;
+  #include <fog_vertex>
+}`;
+const OCEAN_FS = /* glsl */ `
+uniform vec3 uDeep;
+uniform vec3 uShallow;
+uniform vec3 uSky;
+uniform vec3 uSunDir;
+uniform vec3 uSunCol;
+uniform float uTime;
+uniform sampler2D uNormals;
+varying vec3 vPos;
+varying vec3 vNormal;
+varying float vCrest;
+#include <fog_pars_fragment>
+void main() {
+  vec3 n1 = texture2D(uNormals, vPos.xz * 0.045 + vec2(uTime * 0.02, uTime * 0.013)).xyz * 2.0 - 1.0;
+  vec3 n2 = texture2D(uNormals, vPos.xz * 0.11 - vec2(uTime * 0.017, -uTime * 0.021)).xyz * 2.0 - 1.0;
+  vec3 n = normalize(vNormal + vec3(n1.x + n2.x, 0.0, n1.y + n2.y) * 0.18);
+  vec3 v = normalize(cameraPosition - vPos);
+  float fres = pow(1.0 - max(dot(n, v), 0.0), 4.0) * 0.85 + 0.05;
+  float depth = smoothstep(${"${SHORE}"}, ${"${SHORE}"} + 120.0, vPos.z);
+  vec3 water = mix(uShallow, uDeep, depth);
+  vec3 col = mix(water, uSky, fres);
+  vec3 h = normalize(uSunDir + v);
+  col += uSunCol * pow(max(dot(n, h), 0.0), 220.0) * 2.5;
+  // whitecaps on the crests and surf along the shore
+  float foam = smoothstep(0.55, 1.15, vCrest) + (1.0 - smoothstep(0.0, 14.0, vPos.z - ${"${SHORE}"})) * (0.6 + 0.4 * sin(vPos.x * 0.35 + uTime * 2.0));
+  foam *= 0.55 + 0.45 * n1.x;
+  col = mix(col, vec3(0.95, 0.98, 1.0), clamp(foam, 0.0, 0.9));
+  gl_FragColor = vec4(col, 0.96);
+  #include <fog_fragment>
+}`;
+
+export function Ocean({ z, night, sun, storm = 0, shore = 160 }: { z: number; size?: number; night: boolean; sun: [number, number, number]; storm?: number; shore?: number }) {
+  const ref = useRef<THREE.Mesh>(null);
+  const { camera } = useThree();
+  const mat = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader: OCEAN_VS.replaceAll("${SHORE}", shore.toFixed(1)),
+        fragmentShader: OCEAN_FS.replaceAll("${SHORE}", shore.toFixed(1)),
+        transparent: true,
+        fog: true,
+        uniforms: {
+          ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
+          uTime: { value: 0 },
+          uStorm: { value: storm },
+          uDeep: { value: new THREE.Color(night ? "#03111c" : "#0b4a66") },
+          uShallow: { value: new THREE.Color(night ? "#0a2a35" : "#2fb3b8") },
+          uSky: { value: new THREE.Color(night ? "#1a2440" : "#bfe0f5") },
+          uSunDir: { value: new THREE.Vector3(...sun).normalize() },
+          uSunCol: { value: new THREE.Color(night ? "#8899cc" : "#fff3d6") },
+          uNormals: { value: waterNormals() },
+        },
+      }),
+    [night, sun, storm, shore]
+  );
   useFrame((_, dt) => {
-    (water.material as THREE.ShaderMaterial).uniforms.time.value += dt * 0.6;
+    mat.uniforms.uTime.value += dt;
+    if (ref.current) ref.current.position.x = Math.round(camera.position.x / 20) * 20;
   });
-  return <primitive object={water} position={[0, 0.1, z]} />;
+  return (
+    <mesh ref={ref} material={mat} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.1, z]} frustumCulled={false}>
+      <planeGeometry args={[1400, 1400, 240, 240]} />
+    </mesh>
+  );
 }
 
 /* ───────── nightly light & fountain show at the monument ───────── */
