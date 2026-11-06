@@ -1,0 +1,196 @@
+"use client";
+import { useFrame } from "@react-three/fiber";
+import { useRef, type MutableRefObject } from "react";
+import type { Group } from "three";
+import type { PlayerId } from "@/lib/types";
+
+export interface MotionRef {
+  speed: number; // 0..1
+  emote: number; // >0 while emoting (seconds left)
+}
+
+const LOOKS: Record<PlayerId, { shirt: string; pants: string; hair: string; shoe: string; extra: string }> = {
+  adarsh: { shirt: "#3fa9ff", pants: "#26324d", hair: "#21150f", shoe: "#f3efe6", extra: "#ffb23f" },
+  devanshi: { shirt: "#ff7eb3", pants: "#4b2f63", hair: "#34190f", shoe: "#fff4e0", extra: "#ffd166" },
+};
+const SKIN = "#e8b08a";
+
+export function Character({
+  player,
+  motion,
+  scale = 1,
+  onClick,
+}: {
+  player: PlayerId;
+  motion?: MutableRefObject<MotionRef>;
+  scale?: number;
+  onClick?: () => void;
+}) {
+  const L = LOOKS[player];
+  const root = useRef<Group>(null);
+  const body = useRef<Group>(null);
+  const legL = useRef<Group>(null);
+  const legR = useRef<Group>(null);
+  const armL = useRef<Group>(null);
+  const armR = useRef<Group>(null);
+  const head = useRef<Group>(null);
+  const eyes = useRef<Group>(null);
+  const t0 = useRef(Math.random() * 10);
+
+  useFrame((_, dt) => {
+    const m = motion?.current ?? { speed: 0, emote: 0 };
+    t0.current += dt;
+    const t = t0.current;
+    const s = m.speed;
+    const swing = Math.sin(t * 11) * 0.7 * s;
+    if (legL.current) legL.current.rotation.x = swing;
+    if (legR.current) legR.current.rotation.x = -swing;
+    if (armL.current) armL.current.rotation.x = -swing * 0.9;
+    if (armR.current) armR.current.rotation.x = swing * 0.9;
+    if (body.current) {
+      body.current.position.y = Math.abs(Math.sin(t * 11)) * 0.06 * s + Math.sin(t * 2) * 0.012 * (1 - s);
+    }
+    if (head.current) head.current.rotation.z = Math.sin(t * 1.6) * 0.04 * (1 - s);
+    // blink
+    if (eyes.current) eyes.current.scale.y = (t % 4) < 0.12 ? 0.1 : 1;
+    // emote: hop + spin + wave
+    if (root.current) {
+      if (m.emote > 0) {
+        m.emote = Math.max(0, m.emote - dt);
+        const p = 1 - m.emote / 1.2;
+        root.current.position.y = Math.sin(p * Math.PI) * 0.6;
+        root.current.rotation.y = p * Math.PI * 2;
+        if (armR.current) armR.current.rotation.z = -2.4 + Math.sin(t * 20) * 0.3;
+        if (armL.current) armL.current.rotation.z = 2.4 - Math.sin(t * 20) * 0.3;
+      } else {
+        root.current.position.y *= 0.8;
+        root.current.rotation.y *= 0.8;
+        if (armR.current) armR.current.rotation.z *= 0.85;
+        if (armL.current) armL.current.rotation.z *= 0.85;
+      }
+    }
+  });
+
+  return (
+    <group
+      scale={scale}
+      onClick={(e) => {
+        if (!onClick) return;
+        e.stopPropagation();
+        onClick();
+      }}
+    >
+      <group ref={root}>
+        <group ref={body}>
+          {/* legs */}
+          {[
+            [legL, -0.11],
+            [legR, 0.11],
+          ].map(([ref, x], i) => (
+            <group key={i} ref={ref as MutableRefObject<Group>} position={[x as number, 0.48, 0]}>
+              <mesh position={[0, -0.2, 0]} castShadow>
+                <capsuleGeometry args={[0.085, 0.26, 4, 8]} />
+                <meshStandardMaterial color={L.pants} roughness={0.8} />
+              </mesh>
+              <mesh position={[0, -0.42, 0.04]} castShadow>
+                <boxGeometry args={[0.16, 0.09, 0.24]} />
+                <meshStandardMaterial color={L.shoe} roughness={0.6} />
+              </mesh>
+            </group>
+          ))}
+          {/* torso */}
+          <mesh position={[0, 0.78, 0]} castShadow>
+            <capsuleGeometry args={[0.23, 0.3, 6, 12]} />
+            <meshStandardMaterial color={L.shirt} roughness={0.7} />
+          </mesh>
+          {player === "adarsh" ? (
+            // backpack
+            <mesh position={[0, 0.8, -0.24]} castShadow>
+              <boxGeometry args={[0.32, 0.36, 0.14]} />
+              <meshStandardMaterial color={L.extra} roughness={0.7} />
+            </mesh>
+          ) : (
+            // scarf
+            <mesh position={[0, 1.02, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+              <torusGeometry args={[0.17, 0.05, 8, 16]} />
+              <meshStandardMaterial color={L.extra} roughness={0.7} />
+            </mesh>
+          )}
+          {/* arms */}
+          {[
+            [armL, -0.3],
+            [armR, 0.3],
+          ].map(([ref, x], i) => (
+            <group key={i} ref={ref as MutableRefObject<Group>} position={[x as number, 0.98, 0]}>
+              <mesh position={[0, -0.2, 0]} castShadow>
+                <capsuleGeometry args={[0.065, 0.26, 4, 8]} />
+                <meshStandardMaterial color={L.shirt} roughness={0.7} />
+              </mesh>
+              <mesh position={[0, -0.4, 0]}>
+                <sphereGeometry args={[0.07, 10, 10]} />
+                <meshStandardMaterial color={SKIN} roughness={0.6} />
+              </mesh>
+            </group>
+          ))}
+          {/* head */}
+          <group ref={head} position={[0, 1.3, 0]}>
+            <mesh castShadow>
+              <sphereGeometry args={[0.27, 20, 20]} />
+              <meshStandardMaterial color={SKIN} roughness={0.55} />
+            </mesh>
+            <group ref={eyes} position={[0, 0.02, 0.24]}>
+              <mesh position={[-0.09, 0, 0]}>
+                <sphereGeometry args={[0.035, 10, 10]} />
+                <meshBasicMaterial color="#1a120d" />
+              </mesh>
+              <mesh position={[0.09, 0, 0]}>
+                <sphereGeometry args={[0.035, 10, 10]} />
+                <meshBasicMaterial color="#1a120d" />
+              </mesh>
+            </group>
+            <mesh position={[-0.15, -0.07, 0.2]}>
+              <sphereGeometry args={[0.04, 8, 8]} />
+              <meshBasicMaterial color="#ff9a9a" transparent opacity={0.6} />
+            </mesh>
+            <mesh position={[0.15, -0.07, 0.2]}>
+              <sphereGeometry args={[0.04, 8, 8]} />
+              <meshBasicMaterial color="#ff9a9a" transparent opacity={0.6} />
+            </mesh>
+            {/* hair cap */}
+            <mesh position={[0, 0.05, -0.02]} rotation={[-0.35, 0, 0]} castShadow>
+              <sphereGeometry args={[0.29, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
+              <meshStandardMaterial color={L.hair} roughness={0.9} />
+            </mesh>
+            {player === "adarsh" ? (
+              <mesh position={[0.05, 0.22, 0.14]} rotation={[0.6, 0, -0.3]} castShadow>
+                <coneGeometry args={[0.12, 0.22, 6]} />
+                <meshStandardMaterial color={L.hair} roughness={0.9} />
+              </mesh>
+            ) : (
+              <>
+                <mesh position={[0, 0.25, -0.18]} castShadow>
+                  <sphereGeometry args={[0.13, 14, 14]} />
+                  <meshStandardMaterial color={L.hair} roughness={0.9} />
+                </mesh>
+                <mesh position={[0, -0.12, -0.16]} castShadow>
+                  <capsuleGeometry args={[0.2, 0.22, 4, 10]} />
+                  <meshStandardMaterial color={L.hair} roughness={0.9} />
+                </mesh>
+                {/* flower clip */}
+                <mesh position={[0.2, 0.17, 0.1]}>
+                  <icosahedronGeometry args={[0.055, 0]} />
+                  <meshStandardMaterial color={L.extra} emissive={L.extra} emissiveIntensity={0.3} />
+                </mesh>
+              </>
+            )}
+          </group>
+        </group>
+      </group>
+      {/* blob shadow so characters read well even without shadow maps */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+        <circleGeometry args={[0.35, 20]} />
+        <meshBasicMaterial color="#000" transparent opacity={0.22} depthWrite={false} />
+      </mesh>
+    </group>
+  );
+}

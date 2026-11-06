@@ -1,36 +1,29 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# A×D — Our Growth Universe
 
-## Getting Started
+A private, explorable 3D world where Adarsh and Devanshi level up in real life.
 
-First, run the development server:
-
+## Run
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Real-time sync between both phones (Supabase)
+1. Create a free Supabase project and run `supabase/schema.sql` in its SQL editor.
+2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (e.g. in Vercel env vars).
+3. On both phones, enter the **same secret word** during onboarding.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Without these keys the app runs in **local mode**: data lives in this browser and syncs live between tabs on the same device.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Privacy: rows are scoped to a SHA-256 hash of your secret word, which is sent as an `x-space-key` header and enforced by Row Level Security. Live updates use Realtime broadcast and presence on a channel named after that hash.
 
-## Learn More
+## What's inside
+- Opening: a loader with real progress and Pip the mascot, a 5-chapter 3D story, and interactive onboarding.
+- 3D world (`/world`): five floating islands, playable characters, partner shown live, daily XP coins, activity locations (Library, Spring, Forge, Garden, Well, Bonfire, Quest Board, Hall of Fame, Observatory, Bottle Dock), joystick or tap-to-walk, fast-travel map.
+- Personal islands grow from real data: trees come from your level, flowers from your streak, the crystal from study hours, the cairn from workout hours.
+- Quick log from anywhere: study, workout and meditation timers (they survive reloads), meals, water, sleep, mood, steps, and past sessions.
+- XP and levels, 37 medals (27 solo and 10 shared), PNG certificates, Hall of Fame records, leaderboards, daily, weekly and together quests, analytics, and 3D museums (`/museum/adarsh|devanshi|together`).
+- Six hidden secrets (Konami code, the sun, the duck, the glowcap, the logo, Pip).
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Reference note
+The creative reference sites could not be reached from the build environment. The design comes from the screenshots provided. Every model is original procedural geometry, and no third-party assets are used.
