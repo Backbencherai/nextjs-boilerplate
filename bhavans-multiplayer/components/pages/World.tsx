@@ -358,8 +358,8 @@ function LandmarkSheet({ id, onClose, onTrip }: { id: string | null; onClose: ()
             ✈️ Fly there {dry?.ok ? `· 🪙${dry.ticket}` : ""}
           </button>
           {dry && !dry.ok && <p className="tiny muted" style={{ margin: 0 }}>{dry.err}</p>}
-          <a className="btn lg" href={`/explore/?lm=${lm.id}`}>
-            🧭 Walk around it in real 3D
+          <a className="btn lg" href={`/roam/?lm=${lm.id}`}>
+            🧭 Walk around it
           </a>
           <p className="tiny muted" style={{ margin: 0 }}>First visit: +40 💡 and a passport stamp. Recent trips also make your people happier.</p>
         </div>

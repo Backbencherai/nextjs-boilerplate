@@ -61,6 +61,14 @@ Local: `npm install && npm run dev` (http://localhost:3400, in-memory data).
 - **The Red Meteor:** every 7 days at 14:00 UTC, after a 24-hour warning, a fictional meteor strikes. A bunker plus tapping **Take cover** saves your people, and survivors get rewards.
 - **Seasons:** each lasts 30 days and they roll automatically. There are rankings by power, population, wealth, victories, Centerpoint wins and tourism.
 
+## Roam (the open world)
+Tap **🧭 Roam** in the menu. You get an endless cartoon city with towers, streets, traffic, citizens, parks and street lamps, and a monument in the centre (Taj Mahal, Qutub Minar, Eiffel Tower, Gateway of India, Big Ben, Pyramids, Burj Khalifa, Statue of Liberty, Golden Temple, Colosseum).
+- Search any city, monument, beach or mountain. Each city has its own look: New York and Dubai skyscrapers, Paris boulevards, Agra and Jaipur low-rise. Beaches get an ocean; ski places get snow.
+- Walk, run, cab, bus, metro, ski, jet ski, boat and cruise. Fares, gear (ski kit, life jacket…) and stamps are checked by the server.
+- Camera: 3rd person, 1st person or drone (button or **V**). Joystick on phones, WASD and drag to look on computers.
+- Real local day and night: lit windows, street lamps and floodlit monuments.
+- Optional: with `GOOGLE_MAPS_KEY` (Map Tiles API) a 🌐 button opens **real photorealistic 3D** of the same place.
+
 ## Multiplayer
 - `app/api/auth`: sign-in (email + PIN, Google, or name only).
 - `app/api/sync`: each phone checks in about every 3 seconds (about every second during a call). The server advances your country, resolves battles and delivers news, chat, messages, raids, trades and call signals.

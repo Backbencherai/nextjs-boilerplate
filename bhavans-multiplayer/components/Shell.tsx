@@ -21,7 +21,7 @@ const NAV = [
   { href: "/city", icon: "🏙️", label: "City" },
   { href: "/world", icon: "🌍", label: "World" },
   { href: "+", icon: "＋", label: "Log" },
-  { href: "/explore", icon: "🧭", label: "Explore" },
+  { href: "/roam", icon: "🧭", label: "Roam" },
   { href: "/me", icon: "👑", label: "Me" },
 ];
 
@@ -49,7 +49,7 @@ export function Shell({ children }: { children: ReactNode }) {
   }, [boot]);
 
   const free = path.startsWith("/install");
-  const immersive = path.startsWith("/explore");
+  const immersive = path.startsWith("/explore") || path.startsWith("/roam");
   return (
     <div className="app">
       <AnimatePresence>
