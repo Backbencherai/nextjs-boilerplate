@@ -68,6 +68,8 @@ Tap **🧭 Roam** in the menu. You get an endless cartoon city with towers, stre
 - Camera: 3rd person, 1st person or drone (button or **V**). Drag with a finger or mouse to orbit all the way around, pinch or scroll to zoom, Q/E to turn. Joystick on phones, WASD on computers.
 - Vehicles (car, bus, speedboat, jet ski) and trees (broadleaf, fir, palm) are modelled in Blender: `python blender/make_props.py -- public/models/props.glb`.
 - Animated advert screens on downtown towers.
+- **Walk into any building** (🚪 Enter apartment). Inside is a furnished flat: living room with sofa, rug and a TV playing ads, kitchen and dining, bedroom with wardrobe, wood floors, ceiling lights and a window over the city. All the furniture is made in Blender. Add `?home=1` to a Roam link to start indoors.
+- Leaf-card trees (broadleaf, fir, palm) with real leaf textures, furnished windows (curtains, blinds, plants, lamps) on every building, reflective rippling pools and fountains, rolling surf at beaches, and soft image-based reflections on paint, glass and water.
 - Real local day and night: lit windows, street lamps and floodlit monuments.
 - Optional: with `GOOGLE_MAPS_KEY` (Map Tiles API) a 🌐 button opens **real photorealistic 3D** of the same place.
 

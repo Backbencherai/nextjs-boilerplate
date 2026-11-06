@@ -2,6 +2,7 @@
 /* Chunky cartoon monuments at roughly real-world size, so a tiny president looks up at them. */
 import { Html } from "@react-three/drei";
 import { useMemo, type ReactNode } from "react";
+import { PoolMat } from "./Festive";
 import * as THREE from "three";
 
 const M = ({ c, r = 0.75, e, m = 0 }: { c: string; r?: number; e?: string; m?: number }) => <meshStandardMaterial color={c} roughness={r} metalness={m} emissive={e ?? "#000"} emissiveIntensity={e ? 0.35 : 0} flatShading />;
@@ -134,7 +135,7 @@ function Taj() {
       {/* the long reflecting pool and cypress trees */}
       <mesh position={[0, 0.25, 85]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[8, 90]} />
-        <meshStandardMaterial color="#5fb7e0" roughness={0.1} metalness={0.3} />
+        <PoolMat color="#3d8fbf" scale={4} />
       </mesh>
       {Array.from({ length: 12 }).map((_, i) => (
         <group key={i}>
@@ -373,7 +374,7 @@ function Golden() {
     <group>
       <mesh position={[0, 0.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[90, 90]} />
-        <meshStandardMaterial color="#5fb7e0" roughness={0.08} metalness={0.3} />
+        <PoolMat color="#3d8fbf" scale={8} />
       </mesh>
       <Box p={[0, 0.6, 30]} s={[6, 1.2, 40]} c="#f4f1ea" />
       <Box p={[0, 7, 0]} s={[20, 13, 20]} c="#e7b931" />
@@ -437,7 +438,7 @@ function Fountain() {
       <Cyl p={[0, 0.6, 0]} r1={14} r2={14} h={1.2} c="#d9d0bf" seg={32} />
       <mesh position={[0, 1.25, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[12.8, 32]} />
-        <meshStandardMaterial color="#6cc3ea" roughness={0.05} metalness={0.3} />
+        <PoolMat color="#3d9bd0" scale={3} speed={2} />
       </mesh>
       <Cyl p={[0, 3, 0]} r1={2} r2={1.2} h={4} c="#efe7d8" />
       <Cyl p={[0, 5.2, 0]} r1={4.5} r2={4.5} h={0.6} c="#efe7d8" seg={24} />

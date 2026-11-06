@@ -20,6 +20,25 @@ import type { CharId } from "@/lib/game/rules";
 import { rng, calamitiesBetween, hits } from "@/lib/game/world";
 import { Animals } from "./Animals";
 import { Prop, useParts } from "./props";
+import { Apartment, FURNITURE, ROOM } from "./Apartment";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+
+/** Soft image-based lighting so paint, glass, water and leaves pick up real-looking reflections. */
+function EnvLight({ intensity = 0.45 }: { intensity?: number }) {
+  const { gl, scene } = useThree();
+  useEffect(() => {
+    const pm = new THREE.PMREMGenerator(gl);
+    const env = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = env;
+    (scene as THREE.Scene & { environmentIntensity: number }).environmentIntensity = intensity;
+    return () => {
+      scene.environment = null;
+      env.dispose();
+      pm.dispose();
+    };
+  }, [gl, scene, intensity]);
+  return null;
+}
 import { countries } from "@/lib/geo";
 import { geoCentroid } from "d3-geo";
 import codes from "@/lib/countryCodes.json";
@@ -92,7 +111,7 @@ const RIDES = ["cab", "bus", "ski", "jetski", "boat"] as const;
 const isRide = (m: Mode): m is (typeof RIDES)[number] => (RIDES as readonly string[]).includes(m);
 const MAIN: Mode[] = ["walk", "run", "cab", "bus", "metro"];
 const FUN: Mode[] = ["ski", "jetski", "boat", "cruise"];
-type Tel = { x: number; z: number; speed: number; heading: number; km: number; yaw?: number; pitch?: number; lift?: number; roof?: number };
+type Tel = { x: number; z: number; speed: number; heading: number; km: number; yaw?: number; pitch?: number; lift?: number; roof?: number; door?: boolean };
 
 const localHour = (lon: number) => {
   const d = new Date();
@@ -140,6 +159,26 @@ export function Roam() {
   const style = useMemo(() => ({ ...base, season, snow: isSnow || sky === "snow" }), [base, season, isSnow, sky]);
   const [festPick, setFestPick] = useState<string>("live");
   const [liftAnim, setLiftAnim] = useState(0);
+  const [inside, setInside] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("home") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [lightsOn, setLightsOn] = useState(true);
+  const outside = useRef<[number, number] | null>(null);
+  const enter = () => {
+    outside.current = [tel.current.x, tel.current.z];
+    setLiftAnim(2);
+    setTimeout(() => setLiftAnim(0), 900);
+    setInside(true);
+  };
+  const leave = () => {
+    setLiftAnim(3);
+    setTimeout(() => setLiftAnim(0), 900);
+    setInside(false);
+  };
   const liveFests = useMemo(() => festivalsNow(place.country), [place]);
   const fests: Festival[] = festPick === "live" ? liveFests : festPick === "none" ? [] : FESTIVALS.filter((f) => f.id === festPick);
   const deco = useMemo(() => decoOf(fests), [fests.map((f) => f.id).join()]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -231,7 +270,16 @@ export function Roam() {
         camera={{ fov: 60, near: 0.2, far: 2400, position: [0, 6, 80] }}
         {...gestureHandlers()}
       >
-        <World key={place.id} india={place.country === "India"} style={style} sky={sky} deco={deco} fight={fight} monument={monument} label={place.name} hour={hour} mode={mode} view={view} character={(nation?.character ?? "scholar") as CharId} tel={tel} />
+        {inside ? (
+          <>
+            <EnvLight intensity={0.35} />
+            <AdTicker />
+            <Apartment night={hour < 6 || hour >= 19} tv={screen(0)} lightsOn={lightsOn} />
+            <Player mode="walk" view={view} character={(nation?.character ?? "scholar") as CharId} tel={tel} boxes={FURNITURE as unknown as Box[]} monumentR={0} style={style} onChunk={() => {}} room={ROOM} spawn={[0, 3.2]} />
+          </>
+        ) : (
+        <World key={place.id} spawn={outside.current} india={place.country === "India"} style={style} sky={sky} deco={deco} fight={fight} monument={monument} label={place.name} hour={hour} mode={mode} view={view} character={(nation?.character ?? "scholar") as CharId} tel={tel} />
+        )}
       </Canvas>
 
       <div className="xp-top">
@@ -316,7 +364,7 @@ export function Roam() {
       )}
 
       <div className="xp-modes">
-        {MAIN.map((m) => (
+        {(inside ? (["walk", "run"] as Mode[]) : MAIN).map((m) => (
           <button key={m} className={mode === m ? "on" : ""} onClick={() => switchMode(m)}>
             <span>{MODES[m].icon}</span>
             <small>{MODES[m].name}</small>
@@ -332,7 +380,17 @@ export function Roam() {
         </button>
       </div>
       <Stick />
-      {!isRide(mode) && (t.roof || (t.lift ?? 0) > 0) ? (
+      {inside ? (
+        <div className="xp-door">
+          <button onClick={leave}>🚪 Leave the apartment</button>
+          <button onClick={() => setLightsOn((v) => !v)}>💡 Lights {lightsOn ? "off" : "on"}</button>
+        </div>
+      ) : !isRide(mode) && !t.roof && t.door ? (
+        <div className="xp-door">
+          <button onClick={enter}>🚪 Enter apartment</button>
+        </div>
+      ) : null}
+      {!inside && !isRide(mode) && (t.roof || (t.lift ?? 0) > 0) ? (
         <button
           className="xp-lift"
           onClick={() => {
@@ -346,7 +404,7 @@ export function Roam() {
       ) : null}
       {liftAnim !== 0 && (
         <div className="xp-liftfx">
-          <b>🛗 {liftAnim > 0 ? "Going up…" : "Going down…"}</b>
+          <b>{liftAnim === 2 ? "🚪 Coming home…" : liftAnim === 3 ? "🚪 Heading out…" : liftAnim > 0 ? "🛗 Going up…" : "🛗 Going down…"}</b>
           <div className="xp-floors" />
         </div>
       )}
@@ -428,7 +486,7 @@ export function Roam() {
 }
 
 /* ───────────────────────── the world ───────────────────────── */
-function World({ india, style, sky, deco, fight, monument, label, hour, mode, view, character, tel }: { india: boolean; style: CityStyle; sky: WSky; deco: Set<import("@/lib/game/festivals").Deco>; fight: "snow" | "color" | "water" | null; monument: string | null; label: string; hour: number; mode: Mode; view: View; character: CharId; tel: React.RefObject<Tel> }) {
+function World({ spawn, india, style, sky, deco, fight, monument, label, hour, mode, view, character, tel }: { spawn: [number, number] | null; india: boolean; style: CityStyle; sky: WSky; deco: Set<import("@/lib/game/festivals").Deco>; fight: "snow" | "color" | "water" | null; monument: string | null; label: string; hour: number; mode: Mode; view: View; character: CharId; tel: React.RefObject<Tel> }) {
   const night = hour < 6 || hour >= 19;
   const dusk = !night && (hour < 7.5 || hour > 17.5);
   const [center, setCenter] = useState<[number, number]>([0, 0]);
@@ -456,6 +514,7 @@ function World({ india, style, sky, deco, fight, monument, label, hour, mode, vi
       <hemisphereLight args={[night ? "#7f8fd0" : style.snow ? "#f4f8ff" : "#ffffff", night ? "#202436" : style.snow ? "#dfe6f0" : "#b9c2a6", (night ? 0.55 : 1.05) * Math.max(0.6, L)]} />
       <SunLight pos={sun} tel={tel} intensity={(night ? 0.25 : dusk ? 1.6 : 2.6) * L} color={sky === "heat" ? "#ffd08a" : dusk ? "#ffc28a" : night ? "#9fb0ff" : "#fff4e0"} />
       <Weather sky={sky} tel={tel} beach={style.env === "beach"} />
+      <EnvLight intensity={night ? 0.15 : 0.45} />
       <Festive deco={deco} night={night || dusk} monumentR={monument ? MONUMENT_RADIUS[monument] ?? 12 : 12} />
       {monument && (night || deco.size > 0) && monument !== "fountain" && <LightShow radius={MONUMENT_RADIUS[monument] ?? 12} />}
       <Throwables me={tel} fight={fight} />
@@ -474,7 +533,7 @@ function World({ india, style, sky, deco, fight, monument, label, hour, mode, vi
       <Traffic style={style} tel={tel} night={night} />
       <People tel={tel} style={style} />
       <Clouds />
-      <Player mode={mode} view={view} character={character} tel={tel} boxes={boxes} monumentR={monument ? MONUMENT_RADIUS[monument] ?? 12 : 0} style={style} onChunk={(c) => (c[0] !== center[0] || c[1] !== center[1]) && setCenter(c)} />
+      <Player spawn={spawn ?? undefined} mode={mode} view={view} character={character} tel={tel} boxes={boxes} monumentR={monument ? MONUMENT_RADIUS[monument] ?? 12 : 0} style={style} onChunk={(c) => (c[0] !== center[0] || c[1] !== center[1]) && setCenter(c)} />
     </>
   );
 }
@@ -515,21 +574,94 @@ function facadeTex() {
     const g = c.getContext("2d")!;
     g.fillStyle = night ? "#000" : "#ffffff";
     g.fillRect(0, 0, c.width, c.height);
-    const r = rng("windows");
     for (let i = 0; i < N; i++)
       for (let j = 0; j < N; j++) {
+        const r = rng(`window:${i}:${j}`); // same flat by day and by night
         const x = i * S + 12;
         const y = j * S + 14;
+        const ww = S - 24;
+        const wh = S - 26;
+        const kind = r(); // what's behind this window
+        const lit = r() < 0.45;
+        const curtain = ["#c9a27a", "#e8d6b8", "#9fb7c9", "#d8a7a7", "#b7c9a2", "#f2e6c9"][Math.floor(r() * 6)];
         if (night) {
-          g.fillStyle = r() < 0.45 ? (r() < 0.5 ? "#ffd27a" : "#ffe9b0") : "#000";
-          g.fillRect(x, y, S - 24, S - 26);
+          if (!lit) {
+            g.fillStyle = "#000";
+            g.fillRect(x, y, ww, wh);
+          } else {
+            const warm = r() < 0.6;
+            const gr = g.createRadialGradient(x + ww / 2, y + wh * 0.35, 2, x + ww / 2, y + wh / 2, ww);
+            gr.addColorStop(0, warm ? "#ffe6a8" : "#e8f0ff");
+            gr.addColorStop(1, warm ? "#d9902f" : "#7f95c9");
+            g.fillStyle = gr;
+            g.fillRect(x, y, ww, wh);
+            // silhouettes of furniture, plants and people against the light
+            g.fillStyle = "rgba(40,25,10,0.55)";
+            if (kind < 0.3) g.fillRect(x + 4, y + wh - 12, ww * 0.6, 12);
+            else if (kind < 0.5) {
+              g.beginPath();
+              g.arc(x + ww - 10, y + wh - 14, 8, 0, Math.PI * 2);
+              g.fill();
+              g.fillRect(x + ww - 12, y + wh - 8, 4, 8);
+            } else if (kind < 0.62) {
+              g.beginPath();
+              g.arc(x + ww * 0.4, y + wh * 0.45, 4, 0, Math.PI * 2);
+              g.fill();
+              g.fillRect(x + ww * 0.4 - 4, y + wh * 0.5, 8, wh * 0.5);
+            }
+            g.fillStyle = "rgba(60,35,15,0.45)";
+            g.fillRect(x, y, 7, wh);
+            g.fillRect(x + ww - 7, y, 7, wh);
+          }
         } else {
-          g.fillStyle = "#6d86a8";
-          g.fillRect(x, y, S - 24, S - 26);
-          g.fillStyle = "#a9c3e0";
-          g.fillRect(x + 3, y + 3, (S - 24) * 0.35, S - 32);
-          g.fillStyle = "#e9e4da";
-          g.fillRect(x - 3, y + S - 26, S - 18, 4);
+          // glass with sky reflection
+          const gl = g.createLinearGradient(x, y, x + ww, y + wh);
+          gl.addColorStop(0, "#9db8d6");
+          gl.addColorStop(0.5, "#5f7898");
+          gl.addColorStop(1, "#3f5470");
+          g.fillStyle = gl;
+          g.fillRect(x, y, ww, wh);
+          if (kind < 0.35) {
+            // curtains drawn to the sides
+            g.fillStyle = curtain;
+            g.fillRect(x, y, ww * 0.22, wh);
+            g.fillRect(x + ww * 0.78, y, ww * 0.22, wh);
+            g.fillStyle = "rgba(0,0,0,0.12)";
+            for (let k = 0; k < 4; k++) g.fillRect(x + k * 3 + 2, y, 1, wh);
+          } else if (kind < 0.55) {
+            // blinds
+            g.fillStyle = "#e9e4da";
+            for (let k = 0; k < 6; k++) g.fillRect(x, y + k * (wh / 6), ww, wh / 12);
+          } else if (kind < 0.7) {
+            // a potted plant on the sill
+            g.fillStyle = "#3f7d3a";
+            g.beginPath();
+            g.arc(x + ww * 0.3, y + wh - 12, 9, 0, Math.PI * 2);
+            g.arc(x + ww * 0.3 + 8, y + wh - 16, 7, 0, Math.PI * 2);
+            g.fill();
+            g.fillStyle = "#b5653d";
+            g.fillRect(x + ww * 0.3 - 6, y + wh - 8, 12, 8);
+          } else if (kind < 0.8) {
+            // a lamp left on
+            g.fillStyle = "#ffe2a8";
+            g.beginPath();
+            g.arc(x + ww * 0.7, y + wh * 0.45, 6, 0, Math.PI * 2);
+            g.fill();
+          }
+          // reflection streak, frame and sill
+          g.fillStyle = "rgba(255,255,255,0.28)";
+          g.beginPath();
+          g.moveTo(x + 4, y + wh);
+          g.lineTo(x + ww * 0.4, y);
+          g.lineTo(x + ww * 0.5, y);
+          g.lineTo(x + 12, y + wh);
+          g.fill();
+          g.strokeStyle = "#e9e4da";
+          g.lineWidth = 3;
+          g.strokeRect(x, y, ww, wh);
+          g.fillRect(x + ww / 2 - 1, y, 2, wh);
+          g.fillStyle = "#d9d2c4";
+          g.fillRect(x - 4, y + wh, ww + 8, 5);
         }
       }
     const t = new THREE.CanvasTexture(c);
@@ -851,28 +983,53 @@ function Ground({ style, tel, wet }: { style: CityStyle; tel: React.RefObject<Te
 }
 
 function Waves() {
-  const ref = useRef<THREE.InstancedMesh>(null);
-  const N = 80;
-  const seeds = useMemo(() => Array.from({ length: N }, (_, i) => [((i * 97) % 600) - 300, OCEAN_Z + 4 + ((i * 53) % 260), (i * 0.37) % 6]), []);
-  const m = useMemo(() => new THREE.Matrix4(), []);
+  // rolling surf: foam lines that build offshore, run up the sand and fade, plus wet sand at the waterline
+  const lines = useRef<THREE.Mesh[]>([]);
+  const foam = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = 512;
+    c.height = 64;
+    const g = c.getContext("2d")!;
+    for (let i = 0; i < 900; i++) {
+      const x = Math.random() * 512;
+      const y = 32 + (Math.random() - 0.5) * 40 * Math.random();
+      g.fillStyle = `rgba(255,255,255,${0.25 + Math.random() * 0.6})`;
+      g.beginPath();
+      g.arc(x, y, 1 + Math.random() * 3, 0, Math.PI * 2);
+      g.fill();
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = THREE.RepeatWrapping;
+    t.repeat.set(30, 1);
+    return t;
+  }, []);
   useFrame(({ clock }) => {
-    if (!ref.current) return;
-    seeds.forEach(([x, z, p], i) => {
-      const s = 0.6 + 0.4 * Math.sin(clock.elapsedTime * 1.2 + p);
-      m.makeScale(6 * s, 1, 0.5).setPosition(x + Math.sin(clock.elapsedTime * 0.3 + p) * 4, 0.12, z);
-      ref.current!.setMatrixAt(i, m);
+    lines.current.forEach((m, i) => {
+      if (!m) return;
+      const u = (clock.elapsedTime * 0.12 + i / 5) % 1;
+      m.position.z = OCEAN_Z + 70 - u * 68;
+      const mat = m.material as THREE.MeshBasicMaterial;
+      mat.opacity = Math.sin(u * Math.PI) * 0.85;
+      m.scale.y = 0.6 + u * 1.6;
+      foam.offset.x = clock.elapsedTime * 0.01;
     });
-    ref.current.instanceMatrix.needsUpdate = true;
   });
   return (
-    <instancedMesh ref={ref} args={[undefined, undefined, N]}>
-      <boxGeometry args={[1, 0.05, 1]} />
-      <meshBasicMaterial color="#e9f8ff" transparent opacity={0.85} />
-    </instancedMesh>
+    <>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.07, OCEAN_Z - 4]}>
+        <planeGeometry args={[2600, 9]} />
+        <meshPhysicalMaterial color="#c9b48a" roughness={0.25} clearcoat={0.6} />
+      </mesh>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <mesh key={i} ref={(m) => void (m && (lines.current[i] = m))} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.16, OCEAN_Z + 20]}>
+          <planeGeometry args={[2600, 3]} />
+          <meshBasicMaterial map={foam} transparent depthWrite={false} />
+        </mesh>
+      ))}
+    </>
   );
 }
 
-/* ───── the plaza: lawns, flowers, benches and a ring of trees ───── */
 function ringColor(style: CityStyle, i: number) {
   if (style.snow) return i % 3 ? "#f2f6fb" : "#2f6b45";
   if (style.season === "autumn") return ["#e8742c", "#f2a516", "#c0392b", "#d9822b", "#8a9a3a"][i % 5];
@@ -924,16 +1081,7 @@ function Plaza({ style, monument, night }: { style: CityStyle; monument: string 
         </group>
       ))}
       {ring.map(([x, z], i) => (
-        <group key={i} position={[x, 0, z]}>
-          <mesh position={[0, 1.3, 0]} castShadow>
-            <cylinderGeometry args={[0.22, 0.32, 2.6, 6]} />
-            <meshStandardMaterial color="#8a5a3b" />
-          </mesh>
-          <mesh position={[0, 4, 0]} castShadow>
-            {style.env === "snow" ? <coneGeometry args={[2, 6, 7]} /> : <icosahedronGeometry args={[2.3, 1]} />}
-            <meshStandardMaterial color={ringColor(style, i)} flatShading />
-          </mesh>
-        </group>
+        <Prop key={i} root={style.snow ? "TreePine" : "TreeBroad"} leaf={ringColor(style, i)} position={[x, 0.2, z]} rotation={[0, i * 1.7, 0]} scale={0.85 + (i % 3) * 0.1} />
       ))}
       {/* floodlights so the monument glows at night */}
       {night && monument && (
@@ -1201,11 +1349,11 @@ function People({ tel, style }: { tel: React.RefObject<Tel>; style: CityStyle })
 }
 
 /* ───── you ───── */
-function Player({ mode, view, character, tel, boxes, monumentR, style, onChunk }: { mode: Mode; view: View; character: CharId; tel: React.RefObject<Tel>; boxes: Box[]; monumentR: number; style: CityStyle; onChunk: (c: [number, number]) => void }) {
+function Player({ mode, view, character, tel, boxes, monumentR, style, onChunk, room, spawn }: { room?: typeof ROOM; spawn?: [number, number]; mode: Mode; view: View; character: CharId; tel: React.RefObject<Tel>; boxes: Box[]; monumentR: number; style: CityStyle; onChunk: (c: [number, number]) => void }) {
   const { camera } = useThree();
   const body = useRef<THREE.Group>(null);
   const spawnZ = monumentR >= 36 ? monumentR + 110 : monumentR + 48;
-  const s = useRef({ x: 0, z: spawnZ, y: 0, yaw: style.env === "beach" ? Math.PI : 0, pitch: -0.04, speed: 0, face: 0, roof: null as Box | null });
+  const s = useRef({ x: spawn ? spawn[0] : 0, z: spawn ? spawn[1] : spawnZ, y: 0, yaw: style.env === "beach" ? Math.PI : 0, pitch: -0.04, speed: 0, face: 0, roof: null as Box | null });
   const [anim, setAnim] = useState<Anim>("idle");
   const [pace, setPace] = useState(1);
   const tmp = useMemo(() => new THREE.Vector3(), []);
@@ -1265,7 +1413,8 @@ function Player({ mode, view, character, tel, boxes, monumentR, style, onChunk }
       st.x = nx;
       st.z = nz;
     }
-    const nearLift = st.roof ? 0 : boxes.find((b) => !b.house && b.h >= 18 && Math.abs(st.x - b.x) < b.w / 2 + 9 && Math.abs(st.z - b.z) < b.d / 2 + 9);
+    tel.current!.door = !room && !st.roof && boxes.some((b) => Math.abs(st.x - b.x) < b.w / 2 + 9 && Math.abs(st.z - b.z) < b.d / 2 + 9);
+    const nearLift = st.roof || room ? 0 : boxes.find((b) => !b.house && b.h >= 18 && Math.abs(st.x - b.x) < b.w / 2 + 9 && Math.abs(st.z - b.z) < b.d / 2 + 9);
     tel.current!.lift = nearLift ? nearLift.h : 0;
     tel.current!.roof = st.roof ? st.roof.h : 0;
     if (st.roof) {
@@ -1277,10 +1426,14 @@ function Player({ mode, view, character, tel, boxes, monumentR, style, onChunk }
       [nx, nz] = collide(towers, nx, nz, rad);
     }
     // buildings
-    const near = st.roof ? [] : boxes.filter((b) => Math.abs(b.x - nx) < 60 && Math.abs(b.z - nz) < 60);
+    const near = st.roof ? [] : room ? boxes : boxes.filter((b) => Math.abs(b.x - nx) < 60 && Math.abs(b.z - nz) < 60);
     const [cx, cz, hit] = collide(near, nx, nz, rad);
     nx = cx;
     nz = cz;
+    if (room) {
+      nx = Math.max(room.x0 + 0.4, Math.min(room.x1 - 0.4, nx));
+      nz = Math.max(room.z0 + 0.4, Math.min(room.z1 - 0.5, nz));
+    }
     // monument footprint
     const dm = Math.hypot(nx, nz);
     if (monumentR && dm < monumentR + rad) {
@@ -1317,12 +1470,14 @@ function Player({ mode, view, character, tel, boxes, monumentR, style, onChunk }
       camera.position.set(st.x, st.y + eye, st.z);
       camera.rotation.set(st.pitch, st.yaw, 0, "YXZ");
     } else {
-      const dist = (view === "drone" ? 34 : ride ? (mode === "bus" ? 15 : 10) : 5.2) * input.zoom;
+      const dist = room ? Math.min(3.4, 3 * input.zoom) : (view === "drone" ? 34 : ride ? (mode === "bus" ? 15 : 10) : 5.2) * input.zoom;
       const pitch = view === "drone" ? Math.min(-0.45, st.pitch - 0.4) : st.pitch;
       const cx2 = st.x + Math.sin(st.yaw) * Math.cos(pitch) * dist;
       const cz2 = st.z + Math.cos(st.yaw) * Math.cos(pitch) * dist;
       const cy2 = st.y + (view === "drone" ? 4 : ride ? 3.2 : 2.2) - Math.sin(pitch) * dist;
-      camera.position.lerp(tmp.set(cx2, Math.max(cy2, 0.8), cz2), Math.min(1, dt * 9));
+      if (room) tmp.set(Math.max(room.x0 + 0.25, Math.min(room.x1 - 0.25, cx2)), Math.min(room.h - 0.25, Math.max(cy2, 1.2)), Math.max(room.z0 + 0.25, Math.min(room.z1 - 0.3, cz2)));
+      else tmp.set(cx2, Math.max(cy2, 0.8), cz2);
+      camera.position.lerp(tmp, Math.min(1, dt * 9));
       // aim a little above your head so towers and monuments fill the screen
       camera.lookAt(st.x - Math.sin(st.yaw) * 4, st.y + (view === "drone" ? 1 : ride ? 2.4 : 2.1), st.z - Math.cos(st.yaw) * 4);
     }
@@ -1333,7 +1488,7 @@ function Player({ mode, view, character, tel, boxes, monumentR, style, onChunk }
     t.yaw = st.yaw;
     t.pitch = view === "first" ? st.pitch : 0;
     t.heading = ((Math.atan2(-Math.sin(st.yaw), -Math.cos(st.yaw)) * 180) / Math.PI + 360) % 360;
-    const ck = `${Math.floor(st.x / CHUNK_M)},${Math.floor(st.z / CHUNK_M)}`;
+    const ck = room ? lastChunk.current : `${Math.floor(st.x / CHUNK_M)},${Math.floor(st.z / CHUNK_M)}`;
     if (ck !== lastChunk.current) {
       lastChunk.current = ck;
       onChunk([Math.floor(st.x / CHUNK_M), Math.floor(st.z / CHUNK_M)]);

@@ -4,6 +4,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { OCEAN_Z } from "@/lib/roam/gen";
+import { PoolMat } from "./Festive";
 
 let sprite: THREE.Texture | null = null;
 function dotSprite() {
@@ -329,7 +330,7 @@ function Tsunami({ tel, beach }: { tel: React.RefObject<{ x: number; z: number }
     <>
       <group ref={wave}>
         <mesh geometry={curl} rotation={[0, Math.PI / 2, 0]} castShadow>
-          <meshPhysicalMaterial color="#2f8fc6" roughness={0.15} transmission={0.2} thickness={4} />
+          <PoolMat color="#1d6e9c" scale={0.08} speed={4} />
         </mesh>
         <mesh position={[800, 26, 14]}>
           <boxGeometry args={[1600, 3, 6]} />
@@ -338,7 +339,7 @@ function Tsunami({ tel, beach }: { tel: React.RefObject<{ x: number; z: number }
       </group>
       <mesh ref={flood} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[700, 700]} />
-        <meshStandardMaterial color="#4b8fb3" transparent opacity={0.82} roughness={0.1} />
+        <meshPhysicalMaterial color="#4a7f95" transparent opacity={0.85} roughness={0.08} clearcoat={1} />
       </mesh>
     </>
   );

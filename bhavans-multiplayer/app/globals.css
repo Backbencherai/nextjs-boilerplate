@@ -1758,3 +1758,6 @@ label.f {
 .xp-floors::after { content: ""; position: absolute; inset: 0; width: 40%; background: #ffd27a; animation: floors 1.2s linear; }
 @keyframes floors { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
 @keyframes liftfade { 0% { opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
+
+.xp-door { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(204px + var(--safe-b)); z-index: 5; display: flex; gap: 8px; }
+.xp-door button { background: #fff; border: 2px solid #16161d; border-radius: 999px; padding: 9px 16px; font: inherit; font-weight: 900; cursor: pointer; box-shadow: 2px 3px 0 #0004; white-space: nowrap; }

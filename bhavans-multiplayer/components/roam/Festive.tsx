@@ -60,6 +60,22 @@ export function waterNormals() {
   return normals;
 }
 
+/** Rippling, reflective water for pools, fountains and the tsunami wave (cheap: no extra render pass). */
+export function PoolMat({ color = "#2f7fb0", scale = 6, speed = 1 }: { color?: string; scale?: number; speed?: number }) {
+  const m = useMemo(() => {
+    const n = waterNormals().clone();
+    n.wrapS = n.wrapT = THREE.RepeatWrapping;
+    n.repeat.set(scale, scale);
+    n.needsUpdate = true;
+    return new THREE.MeshPhysicalMaterial({ color, roughness: 0.05, metalness: 0.15, normalMap: n, normalScale: new THREE.Vector2(0.45, 0.45), clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.4 });
+  }, [color, scale]);
+  useFrame((_, dt) => {
+    m.normalMap!.offset.x += dt * 0.03 * speed;
+    m.normalMap!.offset.y += dt * 0.017 * speed;
+  });
+  return <primitive object={m} attach="material" />;
+}
+
 export function Ocean({ z, size = 2600, night, sun }: { z: number; size?: number; night: boolean; sun: [number, number, number] }) {
   const water = useMemo(() => {
     const w = new Water(new THREE.PlaneGeometry(size, size), {
@@ -123,7 +139,7 @@ export function LightShow({ radius }: { radius: number }) {
       </mesh>
       <mesh position={[0, 0.62, fz]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[N * 1.9 + 3, 6]} />
-        <meshStandardMaterial color="#1b4f7a" roughness={0.05} metalness={0.4} emissive="#1b6fb0" emissiveIntensity={0.6} />
+        <PoolMat color="#1b5f9a" scale={3} />
       </mesh>
       <instancedMesh ref={jets} args={[undefined, undefined, N]}>
         <cylinderGeometry args={[0.6, 1, 1, 8, 1, true]} />
