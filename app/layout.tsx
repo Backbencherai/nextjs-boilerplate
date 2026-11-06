@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, Instrument_Serif, JetBrains_Mono } from "next/font/google";
+import { Luckiest_Guy, Nunito, JetBrains_Mono } from "next/font/google";
 import { Shell } from "@/components/Shell";
 import "./globals.css";
 
-const display = Bricolage_Grotesque({ variable: "--font-display", subsets: ["latin"], weight: ["400", "600", "800"] });
-const serif = Instrument_Serif({ variable: "--font-serif", subsets: ["latin"], weight: "400", style: ["normal", "italic"] });
+const display = Luckiest_Guy({ variable: "--font-display", subsets: ["latin"], weight: "400" });
+const serif = Nunito({ variable: "--font-body", subsets: ["latin"], weight: ["400", "600", "700", "800", "900"], style: ["normal", "italic"] });
 const mono = JetBrains_Mono({ variable: "--font-mono", subsets: ["latin"], weight: ["400", "600"] });
 
 export const metadata: Metadata = {
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#120b07",
+  themeColor: "#f4f3ef",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",

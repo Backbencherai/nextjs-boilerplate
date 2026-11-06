@@ -145,7 +145,7 @@ function CelebrationLayer() {
   const c = useStore((s) => s.celebrations[0]);
   const shift = useStore((s) => s.shiftCelebration);
   const ach = c?.achId ? ACH_BY_ID.get(c.achId) : undefined;
-  const color = c?.who && c.who !== "together" ? PLAYER_META[c.who].color : "#ffb23f";
+  const color = c?.who && c.who !== "together" ? PLAYER_META[c.who].color : "#c98f06";
   return (
     <AnimatePresence>
       {c && (
@@ -177,7 +177,7 @@ function CelebrationLayer() {
 
 function Confetti() {
   const pieces = Array.from({ length: 60 });
-  const colors = ["#ff7a1a", "#ffd166", "#3fa9ff", "#ff7eb3", "#7ed957", "#fffaf0"];
+  const colors = ["#f2c31a", "#2b5a9b", "#c0342a", "#ffffff", "#9abeef", "#eda6a0"];
   return (
     <div className="confetti" aria-hidden>
       {pieces.map((_, i) => (

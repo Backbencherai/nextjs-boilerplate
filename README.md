@@ -25,5 +25,9 @@ Privacy: rows are scoped to a SHA-256 hash of your secret word, which is sent as
 - XP and levels, 37 medals (27 solo and 10 shared), PNG certificates, Hall of Fame records, leaderboards, daily, weekly and together quests, analytics, and 3D museums (`/museum/adarsh|devanshi|together`).
 - Six hidden secrets (Konami code, the sun, the duck, the glowcap, the logo, Pip).
 
-## Reference note
-The creative reference sites could not be reached from the build environment. The design comes from the screenshots provided. Every model is original procedural geometry, and no third-party assets are used.
+## Design
+The art direction follows dontlookup.app: off-white paper (`#f4f3ef`), near-black ink (`#14140f`), chunky hand-lettered caps, 2.5px outlines, hard offset shadows and wobbly card corners. Color is used sparingly: blue for Adarsh, red for Devanshi, yellow for rewards.
+
+The 3D look comes from `components/three/Ink.tsx`. It gives every mesh 3-step toon shading, washes its color toward paper and adds an inverted-hull ink outline. Meshes marked `userData.keep` keep their color.
+
+Fonts are Luckiest Guy and Nunito from Google Fonts, not the reference site's licensed FGD font. All models and code are original. Nothing is copied from the reference sites.

@@ -36,7 +36,7 @@ export function Trophy({ shape, tier, locked = false }: { shape: TrophyShape; ti
   const mat = useMemo(
     () =>
       locked
-        ? new THREE.MeshStandardMaterial({ color: "#2a2420", roughness: 0.9, transparent: true, opacity: 0.55 })
+        ? new THREE.MeshStandardMaterial({ color: "#8d8a80", roughness: 0.9 })
         : new THREE.MeshStandardMaterial({ color: c.base, metalness: 0.75, roughness: 0.22, emissive: new THREE.Color(c.base).multiplyScalar(0.18) }),
     [locked, c.base]
   );
@@ -86,7 +86,7 @@ export function Trophy({ shape, tier, locked = false }: { shape: TrophyShape; ti
   }, [shape]);
 
   return (
-    <group>
+    <group userData={{ keep: !locked }}>
       {geo && <mesh geometry={geo} material={mat} castShadow />}
       {shape === "cup" && (
         <>

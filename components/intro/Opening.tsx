@@ -1,14 +1,62 @@
 "use client";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import * as THREE from "three";
-import { Character } from "../three/Character";
+import { Character, type MotionRef } from "../three/Character";
 import { Pip } from "../three/Pip";
-import { Bridge, Cloud, Flower, House, Island, Tree } from "../three/props";
+import { Ink } from "../three/Ink";
+import { Crowd } from "../three/Crowd";
+import { Trophy } from "../three/Trophy";
+import { Bridge, Coin, Flower, House, Island, Tree, FocusCrystal } from "../three/props";
 import { useStore } from "@/lib/store";
 import { hashSpace, cloudConfigured } from "@/lib/sync/backend";
 import { PLAYER_META, type PlayerId } from "@/lib/types";
+
+/* ───────────────────────── shared bits ───────────────────────── */
+
+function PaperLights() {
+  return (
+    <>
+      <color attach="background" args={["#f4f3ef"]} />
+      <hemisphereLight args={["#ffffff", "#d8d6ce", 1.15]} />
+      <directionalLight position={[5, 10, 6]} intensity={1.8} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
+      <Ink />
+    </>
+  );
+}
+
+function ShadowFloor({ size = 60 }: { size?: number }) {
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <planeGeometry args={[size, size]} />
+      <shadowMaterial opacity={0.13} />
+    </mesh>
+  );
+}
+
+/** Hand-lettered headline: every letter wobbles a little, and boings when tapped. */
+export function Lettered({ text, className = "" }: { text: string; className?: string }) {
+  return (
+    <span className={`lettered ${className}`} aria-label={text}>
+      {text.split("").map((ch, i) => (
+        <motion.span
+          key={i}
+          aria-hidden
+          className="letter"
+          style={{ rotate: ((i * 37) % 9) - 4 }}
+          initial={{ y: 60, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.15 + i * 0.04, type: "spring", stiffness: 320, damping: 16 }}
+          whileHover={{ y: -8, rotate: ((i * 53) % 14) - 7 }}
+          whileTap={{ scale: 1.3, y: -14 }}
+        >
+          {ch === " " ? " " : ch}
+        </motion.span>
+      ))}
+    </span>
+  );
+}
 
 /* ───────────────────────── Loader ───────────────────────── */
 
@@ -32,10 +80,7 @@ export function Loader({ onDone }: { onDone: () => void }) {
   useEffect(() => {
     let raf = 0;
     const tick = () => {
-      setShown((v) => {
-        const next = v + Math.max(0.002, (real - v) * 0.06);
-        return Math.min(real, next);
-      });
+      setShown((v) => Math.min(real, v + Math.max(0.003, (real - v) * 0.07)));
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -43,26 +88,19 @@ export function Loader({ onDone }: { onDone: () => void }) {
   }, [real]);
   useEffect(() => {
     if (shown >= 0.999) {
-      const t = setTimeout(onDone, 450);
+      const t = setTimeout(onDone, 350);
       return () => clearTimeout(t);
     }
   }, [shown, onDone]);
 
-  const line = !steps.fonts ? "waking Pip up…" : !steps.engine ? "growing the islands…" : !steps.data ? "syncing your universe…" : "ready.";
+  const line = !steps.fonts ? "sharpening pencils…" : !steps.engine ? "drawing the islands…" : !steps.data ? "syncing your universe…" : "ready!";
 
   return (
-    <motion.div className="loader" exit={{ opacity: 0, scale: 1.04 }} transition={{ duration: 0.6 }}>
-      <div className="loader-grain" />
-      <div className="loader-top mono">
-        <span>A×D / UNIVERSE</span>
-        <span>{new Date().getFullYear()}</span>
-      </div>
+    <motion.div className="loader" exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
       <div className="loader-stage">
-        <Canvas camera={{ position: [0, 0.6, 3.2], fov: 40 }} dpr={[1, 2]}>
-          <ambientLight intensity={0.6} />
-          <directionalLight position={[2, 4, 3]} intensity={2.2} color="#fff1dc" />
-          <directionalLight position={[-3, 1, -2]} intensity={0.6} color="#ff9a5a" />
-          <group position={[0, -0.3, 0]}>
+        <Canvas shadows camera={{ position: [0, 1.4, 3.6], fov: 38 }} dpr={[1, 2]}>
+          <PaperLights />
+          <group position={[0, -0.35, 0]}>
             <Pip
               progress={shown}
               onPoke={() => {
@@ -71,189 +109,252 @@ export function Loader({ onDone }: { onDone: () => void }) {
               }}
             />
           </group>
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.66, 0]}>
-            <circleGeometry args={[0.6, 32]} />
-            <meshBasicMaterial color="#000" transparent opacity={0.35} />
-          </mesh>
+          <group position={[0, -0.7, 0]}>
+            <ShadowFloor size={10} />
+          </group>
         </Canvas>
       </div>
       <div className="loader-bottom">
-        <div className="loader-pct display">{Math.round(shown * 100)}</div>
-        <div className="loader-line mono">{line}</div>
-        <div className="loader-bar">
-          <i style={{ transform: `scaleX(${shown})` }} />
+        <div className="loader-pct display">{Math.round(shown * 100)}%</div>
+        <div className="fee-bar">
+          <i style={{ width: `${shown * 100}%` }} />
         </div>
+        <div className="loader-line">{line}</div>
       </div>
     </motion.div>
   );
 }
 
-/* ───────────────────────── Story ───────────────────────── */
+/* ───────────────────────── Landing ───────────────────────── */
+
+function LandingScene() {
+  const a = useRef<MotionRef>({ speed: 0, emote: 0 });
+  const d = useRef<MotionRef>({ speed: 0, emote: 0 });
+  const rig = useRef<THREE.Group>(null);
+  useFrame((s) => {
+    if (rig.current) {
+      rig.current.rotation.y += (s.pointer.x * 0.25 - rig.current.rotation.y) * 0.04;
+    }
+  });
+  return (
+    <>
+      <PaperLights />
+      <group ref={rig}>
+        <group position={[-0.75, 0, 0.4]} rotation={[0, 0.35, 0]} scale={2.1}>
+          <Character player="adarsh" motion={a} onClick={() => (a.current.emote = 1.2)} />
+        </group>
+        <group position={[0.75, 0, 0.4]} rotation={[0, -0.35, 0]} scale={2.1}>
+          <Character player="devanshi" motion={d} onClick={() => (d.current.emote = 1.2)} />
+        </group>
+        <Crowd count={46} radius={9} avoid={2.2} seed="landing" />
+        <ShadowFloor />
+      </group>
+    </>
+  );
+}
+
+function LandingCamera() {
+  const { camera, viewport } = useThree();
+  useEffect(() => {
+    const portrait = viewport.aspect < 1;
+    // frame the pair in the upper part of the screen; the lettering sits below them
+    camera.position.set(0, portrait ? 12.5 : 9, portrait ? 15 : 11.5);
+    camera.lookAt(0, portrait ? -1.6 : -0.6, portrait ? 2.6 : 1.6);
+  }, [camera, viewport.aspect]);
+  return null;
+}
+
+export function Landing({ onStart, onStory, returning }: { onStart: () => void; onStory: () => void; returning: boolean }) {
+  return (
+    <motion.div className="landing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.3 } }}>
+      <div className="landing-canvas">
+        <Canvas shadows camera={{ position: [0, 10, 9], fov: 40 }} dpr={[1, 1.75]}>
+          <LandingCamera />
+          <LandingScene />
+        </Canvas>
+      </div>
+      <div className="landing-copy">
+        <h1 className="landing-title display">
+          <Lettered text="LEVEL UP" />
+          <Lettered text="TOGETHER" className="sm" />
+        </h1>
+        <p className="landing-names display">
+          <span style={{ color: PLAYER_META.adarsh.color }}>Adarsh</span> <span className="x">×</span>{" "}
+          <span style={{ color: PLAYER_META.devanshi.color }}>Devanshi</span>
+        </p>
+        <p className="landing-sub">Two people, one tiny universe. Every hour you study, train, eat well and rest makes your world grow.</p>
+        <div className="row gap center">
+          <button className="btn btn-primary btn-lg" onClick={onStart}>
+            {returning ? "Continue" : "Start"}
+          </button>
+          <button className="btn btn-ghost btn-lg" onClick={onStory}>
+            Story
+          </button>
+        </div>
+      </div>
+      <p className="landing-foot">a private universe for two · poke anyone you see</p>
+    </motion.div>
+  );
+}
+
+/* ───────────────────────── Story (illustrated cards) ───────────────────────── */
 
 const CHAPTERS = [
-  { kicker: "Once upon a now,", big: ["two", "people."], sub: "" },
-  { kicker: "meet", big: ["Adarsh", "& Devanshi."], sub: "Two worlds, side by side." },
-  { kicker: "every single day,", big: ["study.", "lift. rest.", "grow."], sub: "Small things, done again and again." },
-  { kicker: "and here, every real hour", big: ["becomes", "a tree."], sub: "Each glass of water, a flower. Each streak, a fire." },
-  { kicker: "so —", big: ["grow alone.", "grow together."], sub: "" },
-];
-
-const CAMS: [number, number, number][] = [
-  [0, 3, 16],
-  [0, 4.5, 13],
-  [-5, 3.5, 9],
-  [5, 5, 11],
-  [0, 7, 14],
+  { title: "Two people", body: "Adarsh and Devanshi. Two lives, two schedules, two separate little worlds floating side by side." },
+  { title: "Real life counts", body: "Every study session, workout, healthy meal, glass of water and good night of sleep earns real XP." },
+  { title: "Your island grows", body: "Hours become trees, books, crystals and weight plates. Streaks become flowers. You can walk around all of it." },
+  { title: "Quests & medals", body: "Daily and weekly quests, 37 medals, certificates you can download, and a 3D museum for each of you." },
+  { title: "Better together", body: "Some quests only work if you both show up. Cheer each other on, send bottles, and build the shared island." },
 ];
 
 function StoryScene({ ch }: { ch: number }) {
   const left = useRef<THREE.Group>(null);
   const right = useRef<THREE.Group>(null);
   const bridge = useRef<THREE.Group>(null);
+  const trophy = useRef<THREE.Group>(null);
+  const a = useRef<MotionRef>({ speed: 0, emote: 0 });
+  const d = useRef<MotionRef>({ speed: 0, emote: 0 });
   const { camera } = useThree();
-  const look = useRef(new THREE.Vector3());
+  useEffect(() => {
+    if (ch === 1) {
+      a.current.emote = 1.2;
+      setTimeout(() => (d.current.emote = 1.2), 300);
+    }
+    if (ch === 4) {
+      a.current.emote = 1.2;
+      d.current.emote = 1.2;
+    }
+  }, [ch]);
   useFrame((state, dt) => {
-    const sep = ch < 3 ? 7.5 : ch === 3 ? 5.8 : 4.8;
-    if (left.current) left.current.position.x += (-sep - left.current.position.x) * dt * 1.2;
-    if (right.current) right.current.position.x += (sep - right.current.position.x) * dt * 1.2;
-    if (left.current) left.current.position.y = Math.sin(state.clock.elapsedTime * 0.6) * 0.15;
-    if (right.current) right.current.position.y = Math.sin(state.clock.elapsedTime * 0.6 + 1.5) * 0.15;
+    const sep = ch < 4 ? 4.4 : 3.3;
+    if (left.current) {
+      left.current.position.x += (-sep - left.current.position.x) * dt * 2;
+      left.current.position.y = Math.sin(state.clock.elapsedTime * 0.8) * 0.12;
+    }
+    if (right.current) {
+      right.current.position.x += (sep - right.current.position.x) * dt * 2;
+      right.current.position.y = Math.sin(state.clock.elapsedTime * 0.8 + 1.5) * 0.12;
+    }
     if (bridge.current) {
       const s = ch >= 4 ? 1 : 0.0001;
-      bridge.current.scale.x += (s - bridge.current.scale.x) * dt * 2;
-      bridge.current.visible = bridge.current.scale.x > 0.01;
+      bridge.current.scale.x += (s - bridge.current.scale.x) * dt * 3;
+      bridge.current.visible = bridge.current.scale.x > 0.02;
     }
-    const c = CAMS[ch];
-    // portrait phones see far less horizontally: pull back so both islands stay in frame
-    const f = Math.min(2.1, Math.max(1, 1.15 / state.viewport.aspect));
-    camera.position.lerp(new THREE.Vector3(c[0] * (f > 1 ? 0.6 : 1) + state.pointer.x * 0.6, c[1] * f + state.pointer.y * 0.3, c[2] * f), dt * 1.1);
-    look.current.lerp(new THREE.Vector3((ch === 2 ? -4 : ch === 3 ? 4 : 0) * (f > 1 ? 0.6 : 1), f > 1 ? -1.2 : 0.8, 0), dt * 1.5);
-    camera.lookAt(look.current);
+    if (trophy.current) {
+      const s = ch === 3 ? 1.4 : 0.0001;
+      trophy.current.scale.setScalar(trophy.current.scale.x + (s - trophy.current.scale.x) * dt * 4);
+      trophy.current.rotation.y += dt * 1.5;
+      trophy.current.visible = trophy.current.scale.x > 0.02;
+    }
+    const target = new THREE.Vector3(0, 6.5, 10.5);
+    camera.position.lerp(target, dt * 2);
+    camera.lookAt(0, 0.6, 0);
   });
-  const grow = ch >= 3 ? 1 : 0.4;
+  const grow = ch >= 2 ? 1 : 0.45;
   return (
     <>
-      <color attach="background" args={["#ff9c5b"]} />
-      <fog attach="fog" args={["#ffb27a", 14, 40]} />
-      <hemisphereLight args={["#fff0de", "#a15a2e", 0.9]} />
-      <directionalLight position={[6, 10, 6]} intensity={2.4} color="#ffe2b8" />
-      <Cloud position={[-8, -3, -6]} scale={2} />
-      <Cloud position={[9, 4, -10]} scale={2.4} speed={0.1} />
-      <Cloud position={[0, -6, 2]} scale={3} speed={0.06} />
-      <group ref={left} position={[-7.5, 0, 0]}>
-        <Island position={[0, 0, 0]} radius={3.2} grass="#80c7a0" seed="story-a" />
-        <House position={[-0.6, 0, -1.2]} wall="#dfeefa" roof={PLAYER_META.adarsh.accent} />
-        <group position={[0.9, 0, 0.9]} rotation={[0, 0.5, 0]}>
-          <Character player="adarsh" />
+      <PaperLights />
+      <group ref={left} position={[-4.4, 0, 0]}>
+        <Island position={[0, 0, 0]} radius={2.6} grass="#cfe0a8" seed="story-a" />
+        <House position={[-0.5, 0, -1]} wall="#ffffff" roof={PLAYER_META.adarsh.color} />
+        <group position={[0.9, 0, 0.8]} rotation={[0, 0.5, 0]}>
+          <Character player="adarsh" motion={a} />
         </group>
-        <Tree position={[-2, 0, 0.9]} scale={grow} />
-        <Tree position={[1.8, 0, -1.2]} scale={grow * 0.8} variant={1} />
-        {ch >= 3 && [0, 1, 2, 3, 4].map((i) => <Flower key={i} position={[-1 + i * 0.5, 0, 2]} color={i % 2 ? "#3fa9ff" : "#ffd166"} />)}
+        <Tree position={[-1.7, 0, 0.8]} scale={grow} />
+        <Tree position={[1.5, 0, -1]} scale={grow * 0.8} variant={1} />
+        {ch >= 2 && <FocusCrystal position={[-0.6, 0, 1.6]} hours={9} color={PLAYER_META.adarsh.color} />}
+        {ch >= 2 && [0, 1, 2, 3].map((i) => <Flower key={i} position={[-0.4 + i * 0.4, 0, 1.9]} color="#f2c31a" />)}
+        {ch === 1 && <Coin position={[0.9, 1.1, 0.8]} />}
       </group>
-      <group ref={right} position={[7.5, 0, 0]}>
-        <Island position={[0, 0, 0]} radius={3.2} grass="#a8d36a" seed="story-d" />
-        <House position={[0.6, 0, -1.2]} wall="#fde6ee" roof={PLAYER_META.devanshi.accent} />
-        <group position={[-0.9, 0, 0.9]} rotation={[0, -0.5, 0]}>
-          <Character player="devanshi" />
+      <group ref={right} position={[4.4, 0, 0]}>
+        <Island position={[0, 0, 0]} radius={2.6} grass="#cfe0a8" seed="story-d" />
+        <House position={[0.5, 0, -1]} wall="#ffffff" roof={PLAYER_META.devanshi.color} />
+        <group position={[-0.9, 0, 0.8]} rotation={[0, -0.5, 0]}>
+          <Character player="devanshi" motion={d} />
         </group>
-        <Tree position={[2, 0, 0.9]} scale={grow} variant={1} />
-        <Tree position={[-1.8, 0, -1.2]} scale={grow * 0.8} />
-        {ch >= 3 && [0, 1, 2, 3, 4].map((i) => <Flower key={i} position={[-1 + i * 0.5, 0, 2]} color={i % 2 ? "#ff7eb3" : "#ffffff"} />)}
+        <Tree position={[1.7, 0, 0.8]} scale={grow} variant={1} />
+        <Tree position={[-1.5, 0, -1]} scale={grow * 0.8} />
+        {ch >= 2 && <FocusCrystal position={[0.6, 0, 1.6]} hours={9} color={PLAYER_META.devanshi.color} />}
+        {ch >= 2 && [0, 1, 2, 3].map((i) => <Flower key={i} position={[-0.8 + i * 0.4, 0, 1.9]} color="#f2c31a" />)}
+        {ch === 1 && <Coin position={[-0.9, 1.1, 0.8]} />}
+      </group>
+      <group ref={trophy} position={[0, 1.4, 0]} scale={0.0001}>
+        <Trophy shape="cup" tier="gold" />
       </group>
       <group ref={bridge} scale={[0.0001, 1, 1]}>
-        <Bridge from={[-1.7, 0.4]} to={[1.7, 0.4]} />
+        <Bridge from={[-1.4, 0.3]} to={[1.4, 0.3]} />
       </group>
     </>
+  );
+}
+
+function Card({ children, illo }: { children: ReactNode; illo: ReactNode }) {
+  return (
+    <motion.div className="story-card" initial={{ y: 40, opacity: 0, rotate: -1.5 }} animate={{ y: 0, opacity: 1, rotate: 0 }} exit={{ y: -30, opacity: 0 }} transition={{ type: "spring", stiffness: 260, damping: 24 }}>
+      <div className="story-illo">{illo}</div>
+      {children}
+    </motion.div>
   );
 }
 
 export function Story({ onDone }: { onDone: () => void }) {
   const [ch, setCh] = useState(0);
   const last = ch === CHAPTERS.length - 1;
-  useEffect(() => {
-    if (last) return;
-    const t = setTimeout(() => setCh((c) => c + 1), 4200);
-    return () => clearTimeout(t);
-  }, [ch, last]);
   const c = CHAPTERS[ch];
   return (
-    <motion.div className="story" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !last && setCh(ch + 1)}>
-      <div className="story-canvas">
-        <Canvas camera={{ position: [0, 3, 16], fov: 40 }} dpr={[1, 1.75]}>
-          <StoryScene ch={ch} />
-        </Canvas>
-      </div>
-      <div className="window-light" />
-      <div className="loader-grain" />
-      <div className="story-top mono">
-        <span>
-          {String(ch + 1).padStart(2, "0")} / {String(CHAPTERS.length).padStart(2, "0")}
-        </span>
-        <button
-          className="link-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDone();
-          }}
-        >
-          skip story →
-        </button>
-      </div>
-      <AnimatePresence mode="wait">
-        <motion.div key={ch} className="story-text" initial="hide" animate="show" exit="out">
-          <motion.p className="serif story-kicker" variants={{ hide: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 }, out: { opacity: 0 } }}>
-            {c.kicker}
-          </motion.p>
-          {c.big.map((w, i) => (
-            <div key={i} className="mask">
-              <motion.h1
-                className="display story-big"
-                variants={{
-                  hide: { y: "110%", rotate: 4 },
-                  show: { y: "0%", rotate: 0, transition: { delay: 0.15 + i * 0.12, type: "spring", stiffness: 120, damping: 18 } },
-                  out: { y: "-110%", transition: { duration: 0.35 } },
-                }}
-              >
-                {w}
-              </motion.h1>
-            </div>
-          ))}
-          {c.sub && (
-            <motion.p className="story-sub" variants={{ hide: { opacity: 0 }, show: { opacity: 1, transition: { delay: 0.6 } }, out: { opacity: 0 } }}>
-              {c.sub}
-            </motion.p>
+    <motion.div className="story" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <Card
+        illo={
+          <Canvas shadows camera={{ position: [0, 6.5, 10.5], fov: 42 }} dpr={[1, 1.75]}>
+            <StoryScene ch={ch} />
+          </Canvas>
+        }
+      >
+        <p className="story-count">
+          {ch + 1} of {CHAPTERS.length}
+        </p>
+        <AnimatePresence mode="wait">
+          <motion.div key={ch} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
+            <h2 className="display story-title">{c.title}</h2>
+            <p className="story-body">{c.body}</p>
+          </motion.div>
+        </AnimatePresence>
+        <div className="row gap center">
+          {!last && (
+            <button className="btn btn-ghost" onClick={onDone}>
+              Skip
+            </button>
           )}
-          {last && (
-            <motion.button
-              className="btn btn-cream story-cta"
-              variants={{ hide: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { delay: 0.7 } }, out: { opacity: 0 } }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onDone();
-              }}
-            >
-              Enter the universe »
-            </motion.button>
-          )}
-        </motion.div>
-      </AnimatePresence>
-      {!last && <div className="story-tap mono">tap to continue</div>}
+          <button className="btn btn-primary" onClick={() => (last ? onDone() : setCh(ch + 1))}>
+            {last ? "Let's go" : "Next"}
+          </button>
+        </div>
+      </Card>
     </motion.div>
   );
 }
 
 /* ───────────────────────── Onboarding ───────────────────────── */
 
-function PickScene({ hover }: { hover: PlayerId | null }) {
+function PickScene({ who }: { who: PlayerId | null }) {
+  const a = useRef<MotionRef>({ speed: 0, emote: 0 });
+  const d = useRef<MotionRef>({ speed: 0, emote: 0 });
+  useEffect(() => {
+    if (who === "adarsh") a.current.emote = 1.2;
+    if (who === "devanshi") d.current.emote = 1.2;
+  }, [who]);
   return (
     <>
-      <ambientLight intensity={0.7} />
-      <directionalLight position={[3, 6, 4]} intensity={2} color="#fff0dc" />
-      {(["adarsh", "devanshi"] as PlayerId[]).map((p, i) => (
-        <group key={p} position={[i === 0 ? -0.9 : 0.9, -1, 0]} rotation={[0, i === 0 ? 0.35 : -0.35, 0]} scale={hover === p ? 1.12 : 1}>
-          <Character player={p} motion={{ current: { speed: 0, emote: hover === p ? 0.6 : 0 } }} />
-        </group>
-      ))}
+      <PaperLights />
+      <group position={[-0.85, -1.1, 0]} rotation={[0, 0.35, 0]} scale={who === "adarsh" ? 1.15 : 1}>
+        <Character player="adarsh" motion={a} />
+      </group>
+      <group position={[0.85, -1.1, 0]} rotation={[0, -0.35, 0]} scale={who === "devanshi" ? 1.15 : 1}>
+        <Character player="devanshi" motion={d} />
+      </group>
+      <group position={[0, -1.1, 0]}>
+        <ShadowFloor size={8} />
+      </group>
     </>
   );
 }
@@ -276,42 +377,53 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   };
 
   return (
-    <motion.div className="onboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <div className="loader-grain" />
-      <div className="onboard-step mono">step {step + 1} / 3</div>
+    <motion.div className="story" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <AnimatePresence mode="wait">
         {step === 0 && (
-          <motion.section key="who" className="onboard-card" initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -40, opacity: 0 }}>
-            <p className="serif kicker">Pip asks —</p>
-            <h2 className="display">Who&apos;s holding this phone?</h2>
-            <div className="pick-canvas">
-              <Canvas camera={{ position: [0, 0.3, 4], fov: 40 }} dpr={[1, 2]}>
-                <PickScene hover={who} />
+          <Card
+            key="who"
+            illo={
+              <Canvas shadows camera={{ position: [0, 0.4, 4.2], fov: 40 }} dpr={[1, 2]}>
+                <PickScene who={who} />
               </Canvas>
-            </div>
+            }
+          >
+            <p className="story-count">1 of 3</p>
+            <h2 className="display story-title">Who are you?</h2>
+            <p className="story-body">Pick who&apos;s holding this phone. Your partner picks the other one on theirs.</p>
             <div className="pick-row">
               {(["adarsh", "devanshi"] as PlayerId[]).map((p) => (
-                <button
-                  key={p}
-                  className={`pick ${who === p ? "on" : ""}`}
-                  style={{ ["--c" as string]: PLAYER_META[p].color }}
-                  onClick={() => setWho(p)}
-                >
-                  I&apos;m {PLAYER_META[p].name}
+                <button key={p} className={`pick ${who === p ? "on" : ""}`} style={{ ["--c" as string]: PLAYER_META[p].color }} onClick={() => setWho(p)}>
+                  {PLAYER_META[p].name}
                 </button>
               ))}
             </div>
-            <button className="btn btn-primary wide" disabled={!who} onClick={() => setStep(1)}>
-              Continue
-            </button>
-          </motion.section>
+            <div className="row gap center">
+              <button className="btn btn-primary" disabled={!who} onClick={() => setStep(1)}>
+                Next
+              </button>
+            </div>
+          </Card>
         )}
         {step === 1 && (
-          <motion.section key="code" className="onboard-card" initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -40, opacity: 0 }}>
-            <p className="serif kicker">your private universe</p>
-            <h2 className="display">Choose a secret word.</h2>
-            <p className="muted">
-              Both of you type the <b>same word</b> on your own phones. It becomes the key to your shared universe — nobody without it can see your data.
+          <Card
+            key="code"
+            illo={
+              <Canvas shadows camera={{ position: [0, 1.4, 3.6], fov: 38 }} dpr={[1, 2]}>
+                <PaperLights />
+                <group position={[0, -0.4, 0]}>
+                  <Pip bounce={false} />
+                </group>
+                <group position={[0, -0.75, 0]}>
+                  <ShadowFloor size={8} />
+                </group>
+              </Canvas>
+            }
+          >
+            <p className="story-count">2 of 3</p>
+            <h2 className="display story-title">A secret word</h2>
+            <p className="story-body">
+              You both type the <b>same word</b> on your own phones. It&apos;s the key to your shared universe. Nobody without it can see anything.
             </p>
             <input
               className="input big"
@@ -322,40 +434,48 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
               onChange={(e) => setCode(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && finish()}
             />
-            <p className="small muted">
-              {cloud
-                ? "☁️ Cloud sync is on — your activity appears live on both phones."
-                : "📱 Local mode — data stays on this device. Add Supabase keys (see README) to sync between both phones."}
-            </p>
-            <div className="row gap">
+            <p className="small muted center">{cloud ? "☁️ Live sync is on: you'll see each other in real time." : "📱 Local mode: data stays on this device until Supabase keys are added (see README)."}</p>
+            <div className="row gap center">
               <button className="btn btn-ghost" onClick={() => setStep(0)}>
                 Back
               </button>
-              <button className="btn btn-primary grow" disabled={code.trim().length < 4 || busy} onClick={finish}>
-                {busy ? "Opening…" : "Open our universe"}
+              <button className="btn btn-primary" disabled={code.trim().length < 4 || busy} onClick={finish}>
+                {busy ? "Opening…" : "Open it"}
               </button>
             </div>
-          </motion.section>
+          </Card>
         )}
         {step === 2 && (
-          <motion.section key="how" className="onboard-card" initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ opacity: 0 }}>
-            <p className="serif kicker">how it works</p>
-            <h2 className="display">Three things to know.</h2>
-            <ol className="how-list">
+          <Card
+            key="how"
+            illo={
+              <Canvas shadows camera={{ position: [0, 1.2, 3.4], fov: 38 }} dpr={[1, 2]}>
+                <PaperLights />
+                <group position={[0, -0.1, 0]} scale={1.6}>
+                  <Trophy shape="star" tier="gold" />
+                </group>
+              </Canvas>
+            }
+          >
+            <p className="story-count">3 of 3</p>
+            <h2 className="display story-title">How it works</h2>
+            <ul className="how-list">
               <li>
-                <b>Log real life.</b> Tap <span className="kbd">＋</span> any time to start a study or workout timer, log a meal, water, sleep or mood. It never takes more than two taps.
+                <b>Log real life.</b> Tap <span className="kbd">＋</span> any time: timers, meals, water, sleep, mood. Two taps, never more.
               </li>
               <li>
-                <b>Watch your island grow.</b> Every hour becomes trees, books, crystals and plates in the 3D world. Walk around, collect daily coins and cheer each other on.
+                <b>Watch your island grow.</b> Walk the 3D world, collect daily coins, cheer each other.
               </li>
               <li>
-                <b>Earn your place in the Hall.</b> Quests, medals, levels, certificates and records — each of you has a museum, and there&apos;s one you share.
+                <b>Earn your place.</b> Quests, medals, levels, certificates and museums.
               </li>
-            </ol>
-            <button className="btn btn-primary wide" onClick={onDone}>
-              Let&apos;s grow »
-            </button>
-          </motion.section>
+            </ul>
+            <div className="row gap center">
+              <button className="btn btn-primary" onClick={onDone}>
+                Let&apos;s grow
+              </button>
+            </div>
+          </Card>
         )}
       </AnimatePresence>
     </motion.div>

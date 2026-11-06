@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, type MutableRefObject } from "react";
 import * as THREE from "three";
 import { Character, type MotionRef } from "../three/Character";
 import { Pip } from "../three/Pip";
+import { Ink } from "../three/Ink";
+import { Crowd } from "../three/Crowd";
 import {
   Bonfire,
   Bottle,
@@ -84,8 +86,8 @@ function SkyDome({ night }: { night: boolean }) {
   useFrame(() => {
     const k = 0.05;
     const tgt = night
-      ? [new THREE.Color("#0b1030"), new THREE.Color("#2b2a5c"), new THREE.Color("#120c24")]
-      : [new THREE.Color("#7fc1ff"), new THREE.Color("#ffd9b0"), new THREE.Color("#ffb37a")];
+      ? [new THREE.Color("#1c1e26"), new THREE.Color("#2a2c35"), new THREE.Color("#15161b")]
+      : [new THREE.Color("#ecebe5"), new THREE.Color("#f4f3ef"), new THREE.Color("#e6e4dc")];
     mat.uniforms.top.value.lerp(tgt[0], k);
     mat.uniforms.mid.value.lerp(tgt[1], k);
     mat.uniforms.bottom.value.lerp(tgt[2], k);
@@ -138,12 +140,13 @@ function Scene({ ctl, onZone, onNotes, unreadNotes, night }: Props & { night: bo
   return (
     <>
       <SkyDome night={night} />
-      <fog attach="fog" args={[night ? "#1a1838" : "#ffd7b5", 35, 95]} />
-      <hemisphereLight args={[night ? "#6b74c9" : "#fff1dc", night ? "#1b1530" : "#8c6a4c", night ? 0.45 : 0.9]} />
+      <fog attach="fog" args={[night ? "#22242c" : "#f4f3ef", 38, 100]} />
+      <Ink wash={night ? 0.55 : 0.72} />
+      <hemisphereLight args={[night ? "#8a93c9" : "#ffffff", night ? "#1b1530" : "#d8d6ce", night ? 0.5 : 1.1]} />
       <directionalLight
         position={night ? [-20, 30, -10] : [18, 30, 12]}
-        intensity={night ? 0.5 : 2.1}
-        color={night ? "#a9b8ff" : "#fff0d6"}
+        intensity={night ? 0.6 : 1.9}
+        color={night ? "#a9b8ff" : "#ffffff"}
         castShadow
         shadow-mapSize={[1536, 1536]}
         shadow-camera-left={-28}
@@ -169,7 +172,7 @@ function Scene({ ctl, onZone, onNotes, unreadNotes, night }: Props & { night: bo
         }}
       >
         <sphereGeometry args={[6, 24, 24]} />
-        <meshBasicMaterial color={night ? "#f2f0ff" : "#fff3c2"} fog={false} />
+        <meshBasicMaterial color={night ? "#f4f3ef" : "#f2c31a"} fog={false} />
       </mesh>
 
       <Cloud position={[-12, 6, -14]} scale={1.6} />
@@ -180,7 +183,7 @@ function Scene({ ctl, onZone, onNotes, unreadNotes, night }: Props & { night: bo
       <Cloud position={[-8, -8, -30]} scale={3} speed={0.05} />
 
       {ISLANDS.map((i) => (
-        <Island key={i.id} position={[i.x, 0, i.z]} radius={i.r} grass={night ? "#4f7a52" : i.grass} seed={i.id} onGround={ground} />
+        <Island key={i.id} position={[i.x, 0, i.z]} radius={i.r} grass={night ? "#4f7a52" : "#cfe0a8"} seed={i.id} onGround={ground} />
       ))}
       {BRIDGES.map((b, i) => (
         <Bridge key={i} from={b.from} to={b.to} onGround={ground} />
@@ -215,7 +218,10 @@ function Scene({ ctl, onZone, onNotes, unreadNotes, night }: Props & { night: bo
       {[[-1.5, 0.05, 6], [6.6, 0.05, -2.6], [-6.8, 0.05, 1], [2.5, 0.05, -7]].map((p, i) => (
         <Rock key={i} position={p as [number, number, number]} />
       ))}
-      <Sparkles count={20 + sharedMedals * 12} scale={[14, 3, 14]} position={[0, 1.5, 0]} size={3} speed={0.3} color={night ? "#fff2a8" : "#ffffff"} />
+      <Sparkles count={20 + sharedMedals * 12} scale={[14, 3, 14]} position={[0, 1.5, 0]} size={3} speed={0.3} color={night ? "#f8e08a" : "#f2c31a"} />
+      <Crowd count={10} radius={2.6} center={[-1.2, 1.2]} seed="together-crowd" />
+      <Crowd count={7} radius={2.4} center={[0, 13.6]} seed="body-crowd" />
+      <Crowd count={6} radius={2.2} center={[-0.6, -13.8]} seed="mind-crowd" />
 
       {/* ——— Mind & Body isles (activity locations) ——— */}
       <Library position={[-1.8, 0, -18]} books={Math.floor(u.shared.studyMin / 60)} onClick={zoneClick("library")} />
@@ -329,7 +335,7 @@ function PersonalIsle({ player, onHome }: { player: PlayerId; onHome: (e: ThreeE
       {Array.from({ length: Math.min(8, medalCount) }).map((_, i) => {
         const a = Math.PI * 0.15 + (i / 8) * Math.PI * 0.7;
         return (
-          <mesh key={i} position={[isle.x + Math.cos(a) * 1.2 * side, 1.6 + Math.sin(i) * 0.2, isle.z + 1 + Math.sin(a)]}>
+          <mesh key={i} userData={{ keep: true }} position={[isle.x + Math.cos(a) * 1.2 * side, 1.6 + Math.sin(i) * 0.2, isle.z + 1 + Math.sin(a)]}>
             <octahedronGeometry args={[0.12, 0]} />
             <meshStandardMaterial color="#ffd166" emissive="#ffb703" emissiveIntensity={0.8} />
           </mesh>

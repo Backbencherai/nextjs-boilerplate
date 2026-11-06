@@ -5,8 +5,8 @@ export const PLAYER_META: Record<
   PlayerId,
   { name: string; short: string; color: string; soft: string; accent: string; chart: string }
 > = {
-  adarsh: { name: "Adarsh", short: "A", color: "#3fa9ff", soft: "#bfe3ff", accent: "#1d5f99", chart: "#2b8fe0" },
-  devanshi: { name: "Devanshi", short: "D", color: "#ff7eb3", soft: "#ffd3e5", accent: "#a33a6b", chart: "#e45c98" },
+  adarsh: { name: "Adarsh", short: "A", color: "#2b5a9b", soft: "#9abeef", accent: "#1f4372", chart: "#2b5a9b" },
+  devanshi: { name: "Devanshi", short: "D", color: "#c0342a", soft: "#eda6a0", accent: "#8f2219", chart: "#c0342a" },
 };
 
 export const partnerOf = (p: PlayerId): PlayerId => (p === "adarsh" ? "devanshi" : "adarsh");

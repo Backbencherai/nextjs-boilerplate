@@ -10,6 +10,7 @@ import { useStore } from "@/lib/store";
 import { ACHIEVEMENTS, TIER_COLORS, progressOf } from "@/lib/game/achievements";
 import { PLAYER_META, type PlayerId } from "@/lib/types";
 import { Trophy } from "../three/Trophy";
+import { Ink } from "../three/Ink";
 import { Character } from "../three/Character";
 import { fmtDate } from "@/lib/game/dates";
 import { certFor } from "../fame/Fame";
@@ -123,15 +124,16 @@ function MuseumScene({ who, list, focus, setFocus }: { who: Who; list: typeof AC
     }
   });
 
-  const accent = who === "together" ? "#ffb23f" : PLAYER_META[who].color;
+  const accent = who === "together" ? "#f2c31a" : PLAYER_META[who].color;
 
   return (
     <>
-      <color attach="background" args={["#1a110b"]} />
-      <fog attach="fog" args={["#1a110b", 12, 30]} />
-      <ambientLight intensity={0.35} />
-      <hemisphereLight args={["#ffe9cc", "#2a1a10", 0.5]} />
-      <spotLight position={[0, 9, 0]} angle={0.6} penumbra={0.8} intensity={60} color="#ffd9a8" castShadow />
+      <color attach="background" args={["#f4f3ef"]} />
+      <fog attach="fog" args={["#f4f3ef", 14, 34]} />
+      <Ink wash={0.55} />
+      <ambientLight intensity={0.5} />
+      <hemisphereLight args={["#ffffff", "#d8d6ce", 0.9]} />
+      <spotLight position={[0, 9, 0]} angle={0.7} penumbra={0.8} intensity={50} color="#ffffff" castShadow />
       <Environment resolution={128}>
         <Lightformer intensity={2.5} position={[0, 5, 0]} rotation-x={Math.PI / 2} scale={[10, 10, 1]} color="#fff1dd" />
         <Lightformer intensity={1.5} position={[-6, 2, 0]} rotation-y={Math.PI / 2} scale={[6, 3, 1]} color="#ff9d5c" />
@@ -150,7 +152,7 @@ function MuseumScene({ who, list, focus, setFocus }: { who: Who; list: typeof AC
       {/* floor & walls */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow onClick={() => setFocus(null)}>
         <circleGeometry args={[10, 64]} />
-        <meshStandardMaterial color="#5a3a26" roughness={0.6} metalness={0.1} />
+        <meshStandardMaterial color="#e9e4d6" roughness={0.8} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
         <ringGeometry args={[2.4, 2.55, 64]} />
@@ -158,14 +160,14 @@ function MuseumScene({ who, list, focus, setFocus }: { who: Who; list: typeof AC
       </mesh>
       <mesh position={[0, 3, 0]}>
         <cylinderGeometry args={[10, 10, 6, 48, 1, true]} />
-        <meshStandardMaterial color="#efe2cd" side={THREE.BackSide} roughness={0.9} />
+        <meshStandardMaterial color="#ffffff" side={THREE.BackSide} roughness={0.9} />
       </mesh>
       {Array.from({ length: 16 }).map((_, i) => {
         const a = (i / 16) * Math.PI * 2;
         return (
           <mesh key={i} position={[Math.sin(a) * 9.7, 2.5, Math.cos(a) * 9.7]} rotation={[0, a, 0]}>
             <boxGeometry args={[0.5, 5, 0.3]} />
-            <meshStandardMaterial color="#d9c5a6" />
+            <meshStandardMaterial color="#ffffff" />
           </mesh>
         );
       })}
@@ -207,11 +209,11 @@ function MuseumScene({ who, list, focus, setFocus }: { who: Who; list: typeof AC
           >
             <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
               <boxGeometry args={[0.8, 1, 0.8]} />
-              <meshStandardMaterial color={on ? "#f4ebdd" : "#3b2a1f"} roughness={0.5} />
+              <meshStandardMaterial color={on ? "#ffffff" : "#c9c6bc"} roughness={0.5} />
             </mesh>
             <mesh position={[0, 1.02, 0]}>
               <boxGeometry args={[0.9, 0.05, 0.9]} />
-              <meshStandardMaterial color={on ? TIER_COLORS[a.tier].base : "#2a1d14"} metalness={0.5} roughness={0.3} />
+              <meshStandardMaterial color={on ? TIER_COLORS[a.tier].base : "#a8a59b"} roughness={0.4} />
             </mesh>
             <Floating on={on} active={focus === i}>
               <Trophy shape={a.shape} tier={a.tier} locked={!on} />

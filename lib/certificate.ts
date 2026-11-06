@@ -21,14 +21,14 @@ export async function downloadCertificate(c: CertInput) {
   cv.height = H;
   const g = cv.getContext("2d")!;
   await document.fonts?.ready;
-  const display = getComputedStyle(document.documentElement).getPropertyValue("--font-display").trim() || "serif";
-  const serif = getComputedStyle(document.documentElement).getPropertyValue("--font-serif").trim() || "serif";
-  const mono = getComputedStyle(document.documentElement).getPropertyValue("--font-mono").trim() || "monospace";
+  const display = getComputedStyle(document.body).getPropertyValue("--font-display").trim() || "serif";
+  const serif = getComputedStyle(document.body).getPropertyValue("--font-body").trim() || "serif";
+  const mono = getComputedStyle(document.body).getPropertyValue("--font-mono").trim() || "monospace";
 
   // paper
   const bg = g.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, "#fbf3e4");
-  bg.addColorStop(1, "#f1e2c8");
+  bg.addColorStop(0, "#fbfaf6");
+  bg.addColorStop(1, "#f4f3ef");
   g.fillStyle = bg;
   g.fillRect(0, 0, W, H);
   // grain
@@ -39,7 +39,7 @@ export async function downloadCertificate(c: CertInput) {
   // warm light beam (window-pane shadow)
   g.save();
   g.globalAlpha = 0.08;
-  g.fillStyle = "#ff9d4d";
+  g.fillStyle = "#f2c31a";
   g.beginPath();
   g.moveTo(W * 0.55, 0);
   g.lineTo(W * 0.85, 0);
@@ -49,8 +49,8 @@ export async function downloadCertificate(c: CertInput) {
   g.restore();
 
   // frames
-  g.strokeStyle = "#2a1a10";
-  g.lineWidth = 6;
+  g.strokeStyle = "#14140f";
+  g.lineWidth = 8;
   g.strokeRect(60, 60, W - 120, H - 120);
   g.strokeStyle = c.accent;
   g.lineWidth = 3;

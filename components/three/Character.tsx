@@ -10,10 +10,10 @@ export interface MotionRef {
 }
 
 const LOOKS: Record<PlayerId, { shirt: string; pants: string; hair: string; shoe: string; extra: string }> = {
-  adarsh: { shirt: "#3fa9ff", pants: "#26324d", hair: "#21150f", shoe: "#f3efe6", extra: "#ffb23f" },
-  devanshi: { shirt: "#ff7eb3", pants: "#4b2f63", hair: "#34190f", shoe: "#fff4e0", extra: "#ffd166" },
+  adarsh: { shirt: "#2b5a9b", pants: "#6f6d66", hair: "#14140f", shoe: "#ffffff", extra: "#f2c31a" },
+  devanshi: { shirt: "#c0342a", pants: "#6f6d66", hair: "#14140f", shoe: "#ffffff", extra: "#f2c31a" },
 };
-const SKIN = "#e8b08a";
+const SKIN = "#f1d3bd";
 
 export function Character({
   player,
@@ -99,19 +99,19 @@ export function Character({
             </group>
           ))}
           {/* torso */}
-          <mesh position={[0, 0.78, 0]} castShadow>
+          <mesh userData={{ keep: true }} position={[0, 0.78, 0]} castShadow>
             <capsuleGeometry args={[0.23, 0.3, 6, 12]} />
             <meshStandardMaterial color={L.shirt} roughness={0.7} />
           </mesh>
           {player === "adarsh" ? (
             // backpack
-            <mesh position={[0, 0.8, -0.24]} castShadow>
+            <mesh userData={{ keep: true }} position={[0, 0.8, -0.24]} castShadow>
               <boxGeometry args={[0.32, 0.36, 0.14]} />
               <meshStandardMaterial color={L.extra} roughness={0.7} />
             </mesh>
           ) : (
             // scarf
-            <mesh position={[0, 1.02, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+            <mesh userData={{ keep: true }} position={[0, 1.02, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
               <torusGeometry args={[0.17, 0.05, 8, 16]} />
               <meshStandardMaterial color={L.extra} roughness={0.7} />
             </mesh>
@@ -122,7 +122,7 @@ export function Character({
             [armR, 0.3],
           ].map(([ref, x], i) => (
             <group key={i} ref={ref as MutableRefObject<Group>} position={[x as number, 0.98, 0]}>
-              <mesh position={[0, -0.2, 0]} castShadow>
+              <mesh userData={{ keep: true }} position={[0, -0.2, 0]} castShadow>
                 <capsuleGeometry args={[0.065, 0.26, 4, 8]} />
                 <meshStandardMaterial color={L.shirt} roughness={0.7} />
               </mesh>
@@ -157,27 +157,27 @@ export function Character({
               <meshBasicMaterial color="#ff9a9a" transparent opacity={0.6} />
             </mesh>
             {/* hair cap */}
-            <mesh position={[0, 0.05, -0.02]} rotation={[-0.35, 0, 0]} castShadow>
+            <mesh userData={{ keep: true }} position={[0, 0.05, -0.02]} rotation={[-0.35, 0, 0]} castShadow>
               <sphereGeometry args={[0.29, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
               <meshStandardMaterial color={L.hair} roughness={0.9} />
             </mesh>
             {player === "adarsh" ? (
-              <mesh position={[0.05, 0.22, 0.14]} rotation={[0.6, 0, -0.3]} castShadow>
+              <mesh userData={{ keep: true }} position={[0.05, 0.22, 0.14]} rotation={[0.6, 0, -0.3]} castShadow>
                 <coneGeometry args={[0.12, 0.22, 6]} />
                 <meshStandardMaterial color={L.hair} roughness={0.9} />
               </mesh>
             ) : (
               <>
-                <mesh position={[0, 0.25, -0.18]} castShadow>
+                <mesh userData={{ keep: true }} position={[0, 0.25, -0.18]} castShadow>
                   <sphereGeometry args={[0.13, 14, 14]} />
                   <meshStandardMaterial color={L.hair} roughness={0.9} />
                 </mesh>
-                <mesh position={[0, -0.12, -0.16]} castShadow>
+                <mesh userData={{ keep: true }} position={[0, -0.12, -0.16]} castShadow>
                   <capsuleGeometry args={[0.2, 0.22, 4, 10]} />
                   <meshStandardMaterial color={L.hair} roughness={0.9} />
                 </mesh>
                 {/* flower clip */}
-                <mesh position={[0.2, 0.17, 0.1]}>
+                <mesh userData={{ keep: true }} position={[0.2, 0.17, 0.1]}>
                   <icosahedronGeometry args={[0.055, 0]} />
                   <meshStandardMaterial color={L.extra} emissive={L.extra} emissiveIntensity={0.3} />
                 </mesh>

@@ -66,7 +66,6 @@ export function Home() {
 
       {/* poster hero */}
       <motion.section className="poster" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} style={{ ["--c" as string]: meta.color }}>
-        <div className="window-light soft" />
         <div className="poster-level">
           <span className="mono">LEVEL</span>
           <b className="display">{lv.level}</b>

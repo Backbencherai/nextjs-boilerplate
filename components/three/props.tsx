@@ -586,7 +586,7 @@ export function FocusCrystal({ position, hours, color }: { position: V3; hours: 
         {flat("#cfc6bb")}
       </mesh>
       <group ref={g}>
-        <mesh scale={[0.5, h, 0.5]} castShadow>
+        <mesh scale={[0.5, h, 0.5]} castShadow userData={{ keep: true }}>
           <octahedronGeometry args={[0.6, 0]} />
           <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} flatShading transparent opacity={0.88} roughness={0.15} />
         </mesh>
@@ -621,7 +621,7 @@ export function Glowcap({ position, onClick, found }: { position: V3; found: boo
         <cylinderGeometry args={[0.04, 0.05, 0.2, 6]} />
         {flat("#f3ead8")}
       </mesh>
-      <mesh ref={g} position={[0, 0.22, 0]}>
+      <mesh ref={g} position={[0, 0.22, 0]} userData={{ keep: true }}>
         <sphereGeometry args={[0.13, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial color="#b388ff" emissive="#9d4edd" emissiveIntensity={0.8} />
       </mesh>
@@ -673,7 +673,7 @@ export function Coin({ position, onCollected }: { position: V3; onCollected?: bo
     }
   });
   return (
-    <group ref={g} position={position}>
+    <group ref={g} position={position} userData={{ keep: true }}>
       <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
         <cylinderGeometry args={[0.28, 0.28, 0.07, 18]} />
         <meshStandardMaterial color="#ffcf40" emissive="#ffa500" emissiveIntensity={0.45} metalness={0.6} roughness={0.25} />

@@ -5,6 +5,7 @@ import { useRef, type ReactNode } from "react";
 import type { Group } from "three";
 import { Trophy } from "./three/Trophy";
 import { Pip } from "./three/Pip";
+import { Ink } from "./three/Ink";
 import type { AchievementDef } from "@/lib/game/achievements";
 
 function Spinner({ children }: { children: ReactNode }) {
@@ -20,7 +21,8 @@ function Spinner({ children }: { children: ReactNode }) {
 export default function CelebrationCanvas({ ach }: { ach?: AchievementDef }) {
   return (
     <Canvas camera={{ position: [0, 0, 2.4], fov: 40 }} dpr={[1, 2]}>
-      <ambientLight intensity={0.5} />
+      <Ink wash={0.15} />
+      <ambientLight intensity={0.6} />
       <directionalLight position={[2, 3, 2]} intensity={2.5} />
       <Environment resolution={64}>
         <Lightformer intensity={3} position={[0, 2, 3]} scale={[6, 2, 1]} color="#fff4dd" />
