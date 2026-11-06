@@ -364,7 +364,6 @@ function World({ place, mapsKey, testSet, mode, view, character, tel, onAttr, ho
         if (m) m.side = THREE.DoubleSide;
       });
     });
-    (window as unknown as { __tiles?: TilesRenderer }).__tiles = t;
     return t;
   }, [place, mapsKey, testSet]);
 

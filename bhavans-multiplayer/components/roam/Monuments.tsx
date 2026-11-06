@@ -1,7 +1,7 @@
 "use client";
 /* Chunky cartoon monuments at roughly real-world size, so a tiny president looks up at them. */
 import { Html } from "@react-three/drei";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import * as THREE from "three";
 
 const M = ({ c, r = 0.75, e, m = 0 }: { c: string; r?: number; e?: string; m?: number }) => <meshStandardMaterial color={c} roughness={r} metalness={m} emissive={e ?? "#000"} emissiveIntensity={e ? 0.35 : 0} flatShading />;
@@ -39,20 +39,70 @@ function Dome({ p, r, c, onion = 1.25, spire = true }: { p: [number, number, num
   );
 }
 
+/** A pointed Mughal arch as a flat shape. */
+function Arch({ w, h, c, p, depth = 0 }: { w: number; h: number; c: string; p: [number, number, number]; depth?: number }) {
+  const geo = useMemo(() => {
+    const s = new THREE.Shape();
+    s.moveTo(-w / 2, 0);
+    s.lineTo(-w / 2, h * 0.62);
+    s.quadraticCurveTo(-w / 2, h * 0.9, 0, h);
+    s.quadraticCurveTo(w / 2, h * 0.9, w / 2, h * 0.62);
+    s.lineTo(w / 2, 0);
+    s.lineTo(-w / 2, 0);
+    return depth ? new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false }) : new THREE.ShapeGeometry(s, 12);
+  }, [w, h, depth]);
+  return (
+    <mesh geometry={geo} position={p}>
+      <meshStandardMaterial color={c} roughness={0.7} side={THREE.DoubleSide} />
+    </mesh>
+  );
+}
+
+function TajFace() {
+  return (
+    <group>
+      {/* the great iwan: a trimmed frame with a deep pointed arch */}
+      <mesh position={[0, 14.5, 15.15]}>
+        <boxGeometry args={[14, 23, 0.4]} />
+        <meshStandardMaterial color="#efe9dc" roughness={0.6} />
+      </mesh>
+      <Arch w={10} h={19} c="#c9bfa9" p={[0, 3.2, 15.4]} />
+      <Arch w={7.5} h={15} c="#b3a78f" p={[0, 3.2, 15.45]} />
+      {[-1, 1].map((sd) =>
+        [3.2, 14].map((y) => (
+          <group key={`${sd}${y}`}>
+            <Arch w={4.4} h={9} c="#cfc6b4" p={[sd * 10.5, y, 15.05]} />
+            <Arch w={3.2} h={7} c="#b8ad97" p={[sd * 10.5, y, 15.1]} />
+          </group>
+        ))
+      )}
+      {/* calligraphy band */}
+      <mesh position={[0, 24.2, 15.4]}>
+        <boxGeometry args={[12, 0.6, 0.1]} />
+        <meshStandardMaterial color="#3d3a35" />
+      </mesh>
+    </group>
+  );
+}
+
 function Taj() {
   const W = "#f6f3ec";
   return (
     <group>
       <Box p={[0, 1.5, 0]} s={[70, 3, 70]} c="#efe7d8" />
       <Box p={[0, 3 + 12, 0]} s={[30, 24, 30]} c={W} />
-      {/* arches */}
       {[0, 1, 2, 3].map((i) => (
-        <mesh key={i} rotation={[0, (i * Math.PI) / 2, 0]} position={[0, 0, 0]}>
-          <mesh position={[0, 13, 15.05]}>
-            <planeGeometry args={[9, 16]} />
-            <M c="#cfc6b4" />
-          </mesh>
-        </mesh>
+        <group key={i} rotation={[0, (i * Math.PI) / 2, 0]}>
+          <TajFace />
+        </group>
+      ))}
+      {/* arcade around the platform */}
+      {[0, 1, 2, 3].map((i) => (
+        <group key={"p" + i} rotation={[0, (i * Math.PI) / 2, 0]}>
+          {Array.from({ length: 9 }).map((_, k) => (
+            <Arch key={k} w={4.2} h={2.4} c="#cbbfa8" p={[-28 + k * 7, 0.2, 35.05]} />
+          ))}
+        </group>
       ))}
       <Cyl p={[0, 30, 0]} r1={10} r2={10} h={6} c={W} seg={24} />
       <Dome p={[0, 33, 0]} r={11} c={W} onion={1.35} />
@@ -157,10 +207,24 @@ function Eiffel() {
         <cylinderGeometry args={[6, 17, 60, 4]} />
         <M c={C} />
       </mesh>
+      <mesh position={[0, 75, 0]} rotation={[0, Math.PI / 4, 0]} scale={1.02}>
+        <cylinderGeometry args={[6, 17, 60, 4, 14]} />
+        <meshBasicMaterial color="#4a3221" wireframe />
+      </mesh>
+      {legs.map(([sx, sz]) => (
+        <mesh key={"w" + sx + sz} position={[sx * 18, 22, sz * 18]} rotation={[sz * 0.36, 0, -sx * 0.36]} scale={1.03}>
+          <boxGeometry args={[7, 50, 7, 2, 12, 2]} />
+          <meshBasicMaterial color="#4a3221" wireframe />
+        </mesh>
+      ))}
       <Box p={[0, 106, 0]} s={[14, 2.5, 14]} c="#7d5638" />
       <mesh position={[0, 135, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
         <cylinderGeometry args={[1.2, 6, 56, 4]} />
         <M c={C} />
+      </mesh>
+      <mesh position={[0, 135, 0]} rotation={[0, Math.PI / 4, 0]} scale={1.04}>
+        <cylinderGeometry args={[1.2, 6, 56, 4, 12]} />
+        <meshBasicMaterial color="#4a3221" wireframe />
       </mesh>
       <Cyl p={[0, 168, 0]} r1={0.6} r2={0.2} h={12} c="#c8c8c8" />
     </group>
@@ -256,8 +320,37 @@ function Liberty() {
   const G = "#7fbfa8";
   return (
     <group>
-      <Box p={[0, 6, 0]} s={[28, 12, 28]} c="#c9bba3" />
-      <Box p={[0, 20, 0]} s={[14, 16, 14]} c="#d8ccb5" />
+      {/* star-shaped Fort Wood base */}
+      <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} castShadow>
+        <extrudeGeometry
+          args={[
+            (() => {
+              const sh = new THREE.Shape();
+              for (let i = 0; i < 22; i++) {
+                const a = (i / 22) * Math.PI * 2;
+                const r = i % 2 ? 26 : 38;
+                if (i) sh.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+                else sh.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+              }
+              return sh;
+            })(),
+            { depth: 8, bevelEnabled: false },
+          ]}
+        />
+        <M c="#bfb29a" />
+      </mesh>
+      <Box p={[0, 9.5, 0]} s={[24, 3, 24]} c="#d6cab3" />
+      <Box p={[0, 20, 0]} s={[16, 18, 16]} c="#d8ccb5" />
+      {[0, 1, 2, 3].map((i) => (
+        <group key={i} rotation={[0, (i * Math.PI) / 2, 0]}>
+          <Box p={[0, 20, 8.15]} s={[9, 12, 0.4]} c="#cbbfa7" />
+          <Box p={[0, 24, 8.4]} s={[4, 4, 0.2]} c="#a89a80" />
+          {[-6.6, 6.6].map((x) => (
+            <Box key={x} p={[x, 20, 8.2]} s={[1.6, 18, 0.5]} c="#e2d7c2" />
+          ))}
+        </group>
+      ))}
+      <Box p={[0, 29.6, 0]} s={[18, 1.4, 18]} c="#e2d7c2" />
       <mesh position={[0, 38, 0]} castShadow>
         <coneGeometry args={[6, 22, 12]} />
         <M c={G} />

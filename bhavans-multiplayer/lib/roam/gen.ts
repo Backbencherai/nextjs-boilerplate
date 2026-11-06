@@ -18,6 +18,8 @@ export interface CityStyle {
   ground: string;
   park: number; // chance a lot is a park
   uniform?: boolean; // Paris-style even rooflines
+  season?: string;
+  snow?: boolean;
 }
 
 const PASTEL = ["#f6d6ad", "#f7c6c7", "#cfe3f7", "#d8eecb", "#efe2c4", "#e6d3f5", "#fbe8a6", "#c9ede6", "#f4f1ea", "#ffd2b0"];
@@ -59,13 +61,15 @@ export interface Box {
   h: number;
   color: string;
   roof: number; // 0 flat, 1 rooftop props, 2 pitched
+  house?: boolean; // detached family house with door, chimney and garden
+  face?: number; // which way the front door faces: 0 +z, 1 -z, 2 +x, 3 -x
 }
 export interface Chunk {
   key: string;
   cx: number;
   cz: number;
   boxes: Box[];
-  lots: { x: number; z: number; park: boolean }[];
+  lots: { x: number; z: number; park: boolean; garden?: boolean }[];
   trees: { x: number; z: number; s: number; kind: number }[];
   lamps: { x: number; z: number; r: number }[];
 }
@@ -94,7 +98,8 @@ export function genChunk(style: CityStyle, cx: number, cz: number): Chunk {
       const r = rng(`${style.key}:${gi}:${gj}`);
       const dist = Math.hypot(cxm, czm);
       const park = r() < style.park || (style.env !== "city" && style.env !== "beach" && r() < 0.5);
-      out.lots.push({ x: cxm, z: czm, park });
+      const suburb = !park && (style.env === "city" ? dist > 480 && r() < 0.7 : style.env === "beach" ? dist > 260 && r() < 0.5 : true);
+      out.lots.push({ x: cxm, z: czm, park, garden: suburb });
       // street trees and lamps along the sidewalk
       for (let k = 0; k < 3; k++) {
         out.trees.push({ x: x0 + 6 + k * 12, z: z0 + 1.6, s: 0.8 + r() * 0.5, kind: style.env === "snow" ? 1 : style.env === "beach" ? 3 : r() < 0.25 ? 2 : 0 });
@@ -104,6 +109,23 @@ export function genChunk(style: CityStyle, cx: number, cz: number): Chunk {
       if (park) {
         const n = 6 + Math.floor(r() * 8);
         for (let k = 0; k < n; k++) out.trees.push({ x: x0 + 5 + r() * (LOT - 10), z: z0 + 5 + r() * (LOT - 10), s: 1 + r() * 0.9, kind: style.env === "snow" || style.env === "forest" ? 1 : r() < 0.3 ? 2 : 0 });
+        continue;
+      }
+      if (suburb) {
+        const HOUSE = ["#f4e3c8", "#e9c6a5", "#f7d6d0", "#d9e6f2", "#e2ecd2", "#f6f0e2", "#c97b5d", "#b85c42"];
+        const q = LOT / 2;
+        for (const [qx, qz, face] of [
+          [0, 0, 1],
+          [q, 0, 1],
+          [0, q, 0],
+          [q, q, 0],
+        ] as [number, number, number][]) {
+          const w = 9 + r() * 4;
+          const d = 8 + r() * 3;
+          const floors = r() < 0.65 ? 2 : 1;
+          out.boxes.push({ x: x0 + qx + q / 2, z: z0 + qz + q / 2 + (face ? -1.5 : 1.5), w, d, h: floors * 3.1, color: HOUSE[Math.floor(r() * HOUSE.length)], roof: 2, house: true, face });
+          if (r() < 0.6) out.trees.push({ x: x0 + qx + 2.5, z: z0 + qz + (face ? q - 2.5 : 2.5), s: 0.7 + r() * 0.4, kind: style.env === "snow" ? 1 : r() < 0.2 ? 2 : 0 });
+        }
         continue;
       }
       // split the lot into 1–4 buildings, taller downtown

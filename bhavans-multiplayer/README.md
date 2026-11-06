@@ -69,6 +69,17 @@ Tap **🧭 Roam** in the menu. You get an endless cartoon city with towers, stre
 - Real local day and night: lit windows, street lamps and floodlit monuments.
 - Optional: with `GOOGLE_MAPS_KEY` (Map Tiles API) a 🌐 button opens **real photorealistic 3D** of the same place.
 
+### Seasons, weather, festivals and nature
+- **Seasons** follow each place's real date and hemisphere: spring blossom, summer, monsoon rain, autumn gold and red, snowy winters. Tap the season chip to preview others.
+- **Weather and disasters you can see:** rain, thunderstorms (lightning and thunder), typhoons (trees bend in the wind), whirlwinds, tsunami waves with flooding, and El Niño heatwaves. Disasters from the game's forecast show up live where they strike.
+- **Festivals** on their real dates by country: Diwali, Holi, Christmas, New Year, Chinese New Year, Eid, Ramadan, Rio and Venice Carnival, Songkran, Hanami, Oktoberfest, Halloween, Thanksgiving, Ganesh Chaturthi, Navratri and more.
+  - Decorations to match: diyas and rangoli, lanterns, light strings, Christmas trees, pumpkins, bunting, bonfires and fireworks.
+  - Notifications when a festival is on in your country, and holiday ideas a few days ahead (Home → Festivals & holidays).
+- **Play:** throw Holi colours or Songkran water, and have snowball fights in the snow (button or **F**). Citizens throw back.
+- **Nightly light & fountain show** at every monument, a reflective ocean at beaches, and lifts to the roof of tall buildings.
+- **Nature:** bird flocks, pigeons that scatter, street dogs, cows in Indian cities, deer in forests and snow, dolphins and gulls at the beach, butterflies in spring.
+- **Every country** in the world is searchable in Roam.
+
 ## Multiplayer
 - `app/api/auth`: sign-in (email + PIN, Google, or name only).
 - `app/api/sync`: each phone checks in about every 3 seconds (about every second during a call). The server advances your country, resolves battles and delivers news, chat, messages, raids, trades and call signals.

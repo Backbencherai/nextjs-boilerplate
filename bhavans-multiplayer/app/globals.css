@@ -1740,3 +1740,21 @@ label.f {
 
 .mini { position: absolute; right: 10px; top: calc(64px + var(--safe-t)); z-index: 4; border-radius: 50%; border: 3px solid #16161d; box-shadow: 3px 4px 0 #0004; }
 .mon-sign { background: #fff8e6; border: 2px solid #16161d; border-radius: 8px; padding: 4px 10px; font-weight: 900; white-space: nowrap; font-size: 14px; }
+
+.xp-wx { position: absolute; right: 10px; top: calc(184px + var(--safe-t)); z-index: 4; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.xp-wx button { background: #ffffffee; border: 2px solid #16161d; border-radius: 12px; padding: 6px 10px; font: inherit; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 2px 3px 0 #0003; }
+.xp-wx small { font-weight: 600; opacity: 0.6; }
+.xp-alert { position: absolute; left: 50%; transform: translateX(-50%); top: calc(64px + var(--safe-t)); z-index: 6; background: #d23a3a; color: #fff; font-weight: 900; padding: 8px 14px; border-radius: 12px; border: 2px solid #16161d; animation: pulse 1.2s infinite; max-width: 90vw; text-align: center; }
+
+.xp-throw { position: absolute; left: 150px; bottom: calc(40px + var(--safe-b)); z-index: 5; width: 92px; height: 92px; border-radius: 50%; border: 3px solid #16161d; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font: inherit; cursor: pointer; box-shadow: 3px 4px 0 #0004; }
+.xp-throw span { font-size: 26px; }
+.xp-throw small { font-size: 10px; font-weight: 800; }
+.xp-throw b { font-size: 10px; }
+@media (pointer: fine) { .xp-throw { left: 20px; } }
+
+.xp-lift { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(150px + var(--safe-b)); z-index: 5; background: #16161d; color: #fff; border: 0; border-radius: 999px; padding: 10px 18px; font: inherit; font-weight: 900; cursor: pointer; box-shadow: 0 4px 14px #0006; }
+.xp-liftfx { position: absolute; inset: 0; z-index: 20; background: linear-gradient(#9aa3ad, #6b737d); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; gap: 10px; animation: liftfade 1.4s ease; }
+.xp-floors { width: 90px; height: 6px; border-radius: 3px; background: #fff3; overflow: hidden; position: relative; }
+.xp-floors::after { content: ""; position: absolute; inset: 0; width: 40%; background: #ffd27a; animation: floors 1.2s linear; }
+@keyframes floors { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@keyframes liftfade { 0% { opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }

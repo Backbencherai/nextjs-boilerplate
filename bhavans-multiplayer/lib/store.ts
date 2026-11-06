@@ -11,6 +11,7 @@ import { notify, persistStorage } from "./device";
 import { LM_BY_ID } from "./game/landmarks";
 import * as M from "./game/market";
 import { Caller, type CallState, type Signal } from "./net/call";
+import { festivalsNow, upcomingFestivals } from "./game/festivals";
 
 export interface NewsItem {
   id: string;
@@ -221,6 +222,17 @@ export const useGame = create<State>((set, get) => {
         showNotes([{ icon: "🚨", title: "METEOR ALERT: take cover now!", body: "Open the app and tap Take cover to protect your people.", kind: "bad" }]);
       }
     }
+    // festivals: today in your country, and holiday ideas a few days ahead
+    for (const f of festivalsNow(nation.home.country, now))
+      if (!read(`bhv:fest:${f.id}:on`)) {
+        write(`bhv:fest:${f.id}:on`, 1);
+        showNotes([{ icon: f.icon, title: `Happy ${f.name}!`, body: `${f.blurb} Celebrate in Roam.`, kind: "good" }]);
+      }
+    for (const f of upcomingFestivals(now, 3))
+      if (f.inDays > 0 && !read(`bhv:fest:${f.id}:soon`)) {
+        write(`bhv:fest:${f.id}:soon`, 1);
+        showNotes([{ icon: f.icon, title: `${f.name} in ${f.inDays} day${f.inDays > 1 ? "s" : ""}`, body: `Plan a trip! ${f.blurb}`, kind: "info" }]);
+      }
     // disaster early warnings: a week, a day and an hour before it reaches your country
     for (const c of get().forecast()) {
       const left = c.start - now;

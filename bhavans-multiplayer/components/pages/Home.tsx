@@ -8,6 +8,7 @@ import { CAL_META, COVER_OPEN_MIN, METEOR_WINDOW_MIN, calamitiesBetween, hits, n
 import { Bar, ResBar, Stat, ago, fmt, left, useNow, Flag } from "../ui";
 import { useUI } from "../Shell";
 import { Logo } from "../Logo";
+import { upcomingFestivals } from "@/lib/game/festivals";
 
 export function Home() {
   const n = useGame((s) => s.nation)!;
@@ -97,6 +98,7 @@ export function Home() {
         </div>
       )}
       <Forecast />
+      <Festivals />
       {cals.map((c) => (
         <div key={c.id} className="banner gold">
           <span className="e">{CAL_META[c.type].icon}</span>
@@ -288,6 +290,38 @@ function Forecast() {
           </div>
         );
       })}
+    </section>
+  );
+}
+
+/** Festivals and holidays around the world: notifications and vacation ideas. */
+function Festivals() {
+  const list = useMemo(() => upcomingFestivals(Date.now(), 75).slice(0, 6), []);
+  if (!list.length) return null;
+  return (
+    <section className="card">
+      <div className="card-h">
+        <h3>🎉 Festivals & holidays</h3>
+        <span className="chip">vacation ideas</span>
+      </div>
+      {list.map((f) => (
+        <div key={f.id} className="fc-row">
+          <span className="e">{f.icon}</span>
+          <div className="grow">
+            <b>
+              {f.name} {f.inDays <= 0 ? "· on now!" : `· in ${f.inDays} day${f.inDays > 1 ? "s" : ""}`}
+            </b>
+            <div className="small muted">
+              {f.countries === "all" ? "Everywhere" : f.countries.slice(0, 4).join(", ")} · {f.blurb}
+            </div>
+          </div>
+          {f.city && (
+            <Link className="btn sm" href={`/roam/?lm=${f.city}`}>
+              🧭 Go
+            </Link>
+          )}
+        </div>
+      ))}
     </section>
   );
 }
