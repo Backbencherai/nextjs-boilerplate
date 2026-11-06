@@ -2,123 +2,228 @@
 
 import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon";
-import { flagship, gallery, projects, profile, type Category } from "../data";
+import { flagship, profile, projects, type Category } from "../data";
 
-/* ── Preloader (SAVO-style full-screen fade out) ───────────────── */
-export function Preloader() {
-  const [done, setDone] = useState(false);
+const reducedMotion = () =>
+  typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ── Ambient Noir & Crimson canvas: drifting red orbs + expanding op-art rings,
+      eased mouse parallax, paused when the hero is off-screen or the tab is hidden. */
+export function AuroraCanvas() {
+  const ref = useRef<HTMLCanvasElement>(null);
+
   useEffect(() => {
-    const t = setTimeout(() => setDone(true), 700);
-    return () => clearTimeout(t);
+    const canvas = ref.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+
+    let width = 0;
+    let height = 0;
+    let raf = 0;
+    let running = false;
+    let frame = 0;
+    const mouse = { x: 0.5, y: 0.5, tx: 0.5, ty: 0.5 };
+    const orbs = [
+      { x: 0.35, y: 0.4, r: 0.5, vx: 0.0003, vy: 0.0002, c: "rgba(239, 68, 68, 0.14)" },
+      { x: 0.7, y: 0.45, r: 0.42, vx: -0.0002, vy: 0.0003, c: "rgba(185, 28, 28, 0.10)" },
+      { x: 0.5, y: 0.8, r: 0.48, vx: 0.0002, vy: -0.0002, c: "rgba(255, 255, 255, 0.03)" },
+    ];
+
+    const resize = () => {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    };
+    const onMove = (e: MouseEvent) => {
+      mouse.tx = e.clientX / width;
+      mouse.ty = e.clientY / height;
+    };
+
+    const render = () => {
+      if (!running) return;
+      frame++;
+      mouse.x += (mouse.tx - mouse.x) * 0.04;
+      mouse.y += (mouse.ty - mouse.y) * 0.04;
+      ctx.clearRect(0, 0, width, height);
+
+      for (const o of orbs) {
+        o.x += o.vx;
+        o.y += o.vy;
+        if (o.x < 0.1 || o.x > 0.9) o.vx *= -1;
+        if (o.y < 0.1 || o.y > 0.9) o.vy *= -1;
+        const px = (o.x + (mouse.x - 0.5) * 0.06) * width;
+        const py = (o.y + (mouse.y - 0.5) * 0.06) * height;
+        const r = o.r * Math.min(width, height);
+        const g = ctx.createRadialGradient(px, py, 0, px, py, r);
+        g.addColorStop(0, o.c);
+        g.addColorStop(1, "transparent");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(px, py, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const cx = width * 0.5 + (mouse.x - 0.5) * 20;
+      const cy = height * 0.45 + (mouse.y - 0.5) * 20;
+      const base = (frame * 0.4) % 120;
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 4; i++) {
+        const rr = base + i * 140;
+        const a = Math.max(0, 0.04 - (rr / (Math.max(width, height) * 0.7)) * 0.04);
+        if (a > 0.005) {
+          ctx.strokeStyle = `rgba(255, 255, 255, ${a.toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(cx, cy, rr, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+      raf = requestAnimationFrame(render);
+    };
+
+    const start = () => {
+      if (!running) {
+        running = true;
+        render();
+      }
+    };
+    const stop = () => {
+      running = false;
+      cancelAnimationFrame(raf);
+    };
+    const onVis = () => (document.hidden ? stop() : start());
+
+    resize();
+    window.addEventListener("resize", resize, { passive: true });
+    window.addEventListener("mousemove", onMove, { passive: true });
+    document.addEventListener("visibilitychange", onVis);
+
+    let io: IntersectionObserver | undefined;
+    if (reducedMotion()) {
+      running = true;
+      render();
+      stop();
+    } else {
+      start();
+      const hero = document.getElementById("hero");
+      if (hero) {
+        io = new IntersectionObserver((es) => es.forEach((e) => (e.isIntersecting ? start() : stop())), {
+          threshold: 0.02,
+        });
+        io.observe(hero);
+      }
+    }
+
+    return () => {
+      stop();
+      io?.disconnect();
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("mousemove", onMove);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, []);
-  return (
-    <div className={`preloader${done ? " is-done" : ""}`} aria-hidden="true">
-      <div className="preloader-ring" />
-    </div>
-  );
+
+  return <canvas id="aurora-canvas" ref={ref} aria-hidden="true" />;
 }
 
-/* ── Scroll reveal: data-reveal="top|left|right|bottom" data-delay="0.25"
-      Mirrors scrollReveal.js: "wait Xs, then enter <dir> and move 40px over 1s" */
-export function ScrollReveal() {
+/* ── Hero "build" entrance + scroll reveals for section blocks ─────── */
+export function MotionReveals() {
   useEffect(() => {
-    const els = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"));
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce || !("IntersectionObserver" in window)) {
-      els.forEach((el) => el.classList.add("revealed"));
+    const hero = document.querySelectorAll<HTMLElement>(".hero-flank, .hero-center-col");
+    const items = document.querySelectorAll<HTMLElement>(".reveal-item");
+    if (reducedMotion() || !("IntersectionObserver" in window)) {
+      hero.forEach((el) => el.classList.add("is-built"));
+      items.forEach((el) => el.classList.add("is-visible"));
       return;
     }
-    els.forEach((el) => {
-      const d = el.dataset.delay;
-      if (d) el.style.transitionDelay = `${d}s`;
-    });
+    requestAnimationFrame(() => requestAnimationFrame(() => hero.forEach((el) => el.classList.add("is-built"))));
     const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
+      (es, obs) =>
+        es.forEach((e) => {
           if (e.isIntersecting) {
-            e.target.classList.add("revealed");
-            io.unobserve(e.target);
+            e.target.classList.add("is-visible");
+            obs.unobserve(e.target);
           }
-        });
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -40px 0px" },
+        }),
+      { threshold: 0.12, rootMargin: "0px 0px -36px 0px" },
     );
-    els.forEach((el) => io.observe(el));
+    items.forEach((el) => io.observe(el));
     return () => io.disconnect();
   }, []);
   return null;
 }
 
-/* ── Header: transparent → solid on scroll, mobile toggle ───────── */
+/* ── Floating glass nav dock with active-section highlight ─────────── */
 const navLinks = [
   { href: "#about", label: "About" },
-  { href: "#features", label: "Features" },
   { href: "#flagships", label: "Work" },
   { href: "#projects", label: "Projects" },
-  { href: "#gallery", label: "Gallery" },
   { href: "#contact", label: "Contact" },
 ];
 
-export function Header() {
-  const [scrolled, setScrolled] = useState(false);
-  const [open, setOpen] = useState(false);
+export function NavDock() {
+  const [active, setActive] = useState("");
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    const sections = document.querySelectorAll("section[id]");
+    const io = new IntersectionObserver(
+      (es) => es.forEach((e) => e.isIntersecting && setActive(e.target.id)),
+      { threshold: 0.3 },
+    );
+    sections.forEach((s) => io.observe(s));
+    return () => io.disconnect();
   }, []);
+
   return (
-    <header className={`header${scrolled ? " is-scrolled" : ""}${open ? " is-open" : ""}`}>
-      <div className="container header-inner">
-        <a href="#hero" className="brand" onClick={() => setOpen(false)}>
-          <span className="brand-mono">{profile.initials}</span>
+    <header className="dock-container">
+      <nav className="nav-dock" aria-label="Main navigation">
+        <a href="#hero" className="nav-brand" aria-label={`${profile.name} home`}>
+          <span className="brand-monogram">{profile.initials}</span>
           <span className="brand-label">
             {profile.name.toUpperCase()}
-            <span className="accent">.</span>
+            <span className="brand-dot">.</span>
           </span>
         </a>
-        <button
-          className="nav-toggle"
-          aria-label="Toggle navigation"
-          aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}
-        >
-          <span />
-          <span />
-          <span />
-        </button>
-        <nav className="nav" aria-label="Main navigation">
-          <ul className="menu">
-            {navLinks.map((l) => (
-              <li key={l.href}>
-                <a href={l.href} onClick={() => setOpen(false)}>
-                  {l.label}
-                </a>
-              </li>
-            ))}
-          </ul>
+        <div className="nav-links">
+          {navLinks.map((l) => (
+            <a key={l.href} href={l.href} className={`nav-item${active === l.href.slice(1) ? " active" : ""}`}>
+              {l.label}
+            </a>
+          ))}
+        </div>
+        <div className="dock-right">
           {profile.available && (
-            <span className="status" title="Open to new projects">
-              <span className="status-dot" /> Available
-            </span>
+            <div className="dock-status" title="Currently open for new projects">
+              <span className="status-dot" />
+              <span className="status-text">Available</span>
+            </div>
           )}
-          <a href="#contact" className="btn btn-primary btn-sm" onClick={() => setOpen(false)}>
-            Hire Me
+          <a href="#contact" className="dock-cta">
+            HIRE ME →
           </a>
-        </nav>
-      </div>
+        </div>
+      </nav>
     </header>
   );
 }
 
-/* ── Featured-project layer explorer (tabs) ─────────────────────── */
+/* ── Featured project tab explorer (fade/slide content swap) ───────── */
 export function LayerExplorer() {
   const [active, setActive] = useState(0);
-  const layer = flagship.layers[active];
+  const [shown, setShown] = useState(0);
+  const [fading, setFading] = useState(false);
+
+  const pick = (i: number) => {
+    if (i === active) return;
+    setActive(i);
+    setFading(true);
+    setTimeout(() => {
+      setShown(i);
+      setFading(false);
+    }, 180);
+  };
+  const layer = flagship.layers[shown];
+
   return (
-    <div className="explorer">
-      <div className="explorer-head">
+    <div className="saai-architecture-explorer">
+      <div className="explorer-header">
         <div className="explorer-title">{flagship.explorerTitle}</div>
         <div className="explorer-sub">{flagship.explorerSub}</div>
       </div>
@@ -129,238 +234,104 @@ export function LayerExplorer() {
             role="tab"
             aria-selected={i === active}
             className={`layer-tab${i === active ? " active" : ""}`}
-            onClick={() => setActive(i)}
+            onClick={() => pick(i)}
           >
             {l.tab}
           </button>
         ))}
       </div>
-      <div className="layer-pane" key={active}>
-        <div className="layer-badge">{layer.badge}</div>
-        <h4 className="layer-title">{layer.title}</h4>
-        <p className="layer-desc">{layer.desc}</p>
-        <div className="tags">
-          {layer.tags.map((t) => (
-            <span key={t} className="tag">
-              {t}
-            </span>
-          ))}
+      <div className="layer-inspector-pane">
+        <div className={`layer-content${fading ? " is-fading" : ""}`}>
+          <div className="layer-inspect-badge">{layer.badge}</div>
+          <h4 className="layer-inspect-title">{layer.title}</h4>
+          <p className="layer-inspect-desc">{layer.desc}</p>
+          <div className="tech-tags-group">
+            {layer.tags.map((t) => (
+              <span key={t} className="tech-tag">
+                {t}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-/* ── Filterable project grid ───────────────────────────────────── */
+/* ── Filterable bento grid ─────────────────────────────────────────── */
 const filters: { key: "all" | Category; label: string }[] = [
-  { key: "all", label: `All (${projects.length})` },
+  { key: "all", label: `All Projects (${projects.length})` },
   { key: "web", label: "Web" },
   { key: "design", label: "Design" },
   { key: "tools", label: "Tools" },
 ];
 
-export function ProjectMatrix() {
+export function ProjectFilters() {
   const [filter, setFilter] = useState<"all" | Category>("all");
+  useEffect(() => {
+    document.querySelectorAll<HTMLElement>(".bento-card").forEach((c) => {
+      c.classList.toggle("hidden", filter !== "all" && c.dataset.category !== filter);
+    });
+  }, [filter]);
   return (
-    <>
-      <div className="filters" data-reveal="top" data-delay="0.35">
-        {filters.map((f) => (
-          <button
-            key={f.key}
-            className={`filter-btn${filter === f.key ? " active" : ""}`}
-            onClick={() => setFilter(f.key)}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-      <div className="bento">
-        {projects.map((p, i) => {
-          const hidden = filter !== "all" && p.category !== filter;
-          return (
-            <article
-              key={p.title}
-              className={`card bento-card${hidden ? " is-hidden" : ""}`}
-              data-reveal={i % 2 ? "right" : "left"}
-              data-delay="0.25"
-            >
-              <div className="bento-top">
-                <span className="chip">{p.chip}</span>
-                {p.href ? (
-                  <a href={p.href} target="_blank" rel="noopener noreferrer" className="bento-link" aria-label={`${p.title} link`}>
-                    <Icon name="external" size={16} />
-                  </a>
-                ) : (
-                  <span className="bento-id">#{String(i + 1).padStart(2, "0")}</span>
-                )}
-              </div>
-              <h3 className="bento-title">{p.title}</h3>
-              <p className="bento-desc">{p.desc}</p>
-              <div className="tags">
-                {p.tags.map((t) => (
-                  <span key={t} className="tag">
-                    {t}
-                  </span>
-                ))}
-              </div>
-            </article>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
-/* ── Gallery tile ───────────────────────────────────────────────── */
-function Tile({ g }: { g: (typeof gallery)[number] }) {
-  return (
-    <div
-      className="tile"
-      style={
-        g.src
-          ? { backgroundImage: `url(${g.src})` }
-          : {
-              backgroundImage: `linear-gradient(135deg, hsl(${g.hue} 80% 55%), hsl(${g.hue + 30} 70% 30%))`,
-            }
-      }
-    >
-      <span className="tile-label">{g.title}</span>
-    </div>
-  );
-}
-
-export function GalleryGrid() {
-  return (
-    <div className="gallery-grid">
-      {gallery.map((g, i) => (
-        <div key={g.title} data-reveal="left" data-delay={(0.1 + (i % 4) * 0.1).toFixed(2)}>
-          <Tile g={g} />
-        </div>
+    <div className="bento-controls">
+      {filters.map((f) => (
+        <button key={f.key} className={`filter-btn${filter === f.key ? " active" : ""}`} onClick={() => setFilter(f.key)}>
+          {f.label}
+        </button>
       ))}
     </div>
   );
 }
 
-/* ── Carousel (owl-carousel style: auto-advance, dots, arrows) ──── */
-export function Carousel() {
-  const track = useRef<HTMLDivElement>(null);
-  const [page, setPage] = useState(0);
-  const [pages, setPages] = useState(1);
-  const paused = useRef(false);
-
-  useEffect(() => {
-    const el = track.current;
-    if (!el) return;
-    const measure = () => {
-      setPages(Math.max(1, Math.ceil(el.scrollWidth / el.clientWidth - 0.05)));
-      setPage(Math.round(el.scrollLeft / el.clientWidth));
-    };
-    measure();
-    el.addEventListener("scroll", measure, { passive: true });
-    window.addEventListener("resize", measure);
-    return () => {
-      el.removeEventListener("scroll", measure);
-      window.removeEventListener("resize", measure);
-    };
-  }, []);
-
-  const go = (p: number) => {
-    const el = track.current;
-    if (!el) return;
-    const n = (p + pages) % pages;
-    el.scrollTo({ left: n * el.clientWidth, behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const id = setInterval(() => {
-      if (!paused.current) go(page + 1);
-    }, 4000);
-    return () => clearInterval(id);
-  });
-
-  return (
-    <div
-      className="carousel"
-      onMouseEnter={() => (paused.current = true)}
-      onMouseLeave={() => (paused.current = false)}
-    >
-      <div className="carousel-track" ref={track}>
-        {[...gallery].reverse().map((g) => (
-          <div className="carousel-item" key={g.title}>
-            <Tile g={g} />
-          </div>
-        ))}
-      </div>
-      <button className="carousel-arrow prev" aria-label="Previous" onClick={() => go(page - 1)}>
-        ‹
-      </button>
-      <button className="carousel-arrow next" aria-label="Next" onClick={() => go(page + 1)}>
-        ›
-      </button>
-      <div className="carousel-dots">
-        {Array.from({ length: pages }).map((_, i) => (
-          <button
-            key={i}
-            aria-label={`Go to slide ${i + 1}`}
-            className={`dot${i === page ? " active" : ""}`}
-            onClick={() => go(i)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ── Copy email + toast ─────────────────────────────────────────── */
+/* ── Copy email + floating toast ───────────────────────────────────── */
 export function CopyEmail() {
-  const [toast, setToast] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(profile.email);
-    } catch {
-      /* clipboard may be unavailable; still show feedback */
-    }
-    setToast(true);
-    setTimeout(() => setToast(false), 2400);
+  const [msg, setMsg] = useState("");
+  const [show, setShow] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const toast = (m: string) => {
+    setMsg(m);
+    setShow(true);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setShow(false), 3200);
   };
+
+  const copy = async () => {
+    const text = profile.email;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(`Copied to clipboard: ${text}`);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+        toast(`Copied to clipboard: ${text}`);
+      } catch {
+        toast(`Direct email: ${text}`);
+      }
+      ta.remove();
+    }
+  };
+
   return (
     <>
-      <div className="email-box">
-        <a className="email" href={`mailto:${profile.email}`}>
-          {profile.email}
-        </a>
-        <button className="btn btn-primary btn-rocket" onClick={copy}>
+      <div className="email-action-box">
+        <span className="email-address">{profile.email}</span>
+        <button className="btn btn-primary copy-btn" onClick={copy} aria-label="Copy email address">
           <Icon name="copy" size={16} />
-          <span>Copy Email</span>
+          <span>Copy Email Address</span>
         </button>
       </div>
-      <div className={`toast${toast ? " show" : ""}`} role="status" aria-live="polite">
-        ✓ Email copied: {profile.email}
+      <div className={`toast-notification${show ? " show" : ""}`} aria-live="polite">
+        <span className="toast-icon">✓</span>
+        <span className="toast-text">{msg}</span>
       </div>
     </>
-  );
-}
-
-/* ── Newsletter / message form (front-end only) ─────────────────── */
-export function Subscribe() {
-  const [sent, setSent] = useState(false);
-  return (
-    <form
-      className="subscribe"
-      onSubmit={(e) => {
-        e.preventDefault();
-        const email = new FormData(e.currentTarget).get("email");
-        window.location.href = `mailto:${profile.email}?subject=${encodeURIComponent(
-          "Hello from your portfolio",
-        )}&body=${encodeURIComponent(`Reply to: ${email}`)}`;
-        setSent(true);
-      }}
-    >
-      <input type="email" name="email" required placeholder="Enter your e-mail address..." aria-label="Email address" />
-      <button type="submit" className="subscribe-btn">
-        {sent ? "Sent ✓" : "Notify Me"}
-      </button>
-    </form>
   );
 }

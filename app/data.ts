@@ -8,23 +8,26 @@ export const profile = {
   fullName: "Adarsh",
   initials: "AD",
   role: "Full-Stack Developer & Designer",
+  /** Hero paragraph. Wrap words in **double asterisks** to make them bold. */
   tagline:
-    "I design and build fast, stylish web experiences — from pixel-perfect landing pages to production-grade full-stack apps.",
+    "I design and build **fast, stylish web experiences** — from pixel-perfect landing pages to **production-grade full-stack apps**.",
   email: "hello@adarsh.dev",
   location: "India",
   available: true,
-  resumeUrl: "#",
+  /** Put your photo in /public (e.g. /me.png, transparent PNG works best) and set it here. */
+  photo: "",
+  statusBadge: "OPEN TO NEW PROJECTS",
   stats: [
-    { value: "3+", label: "Years Building" },
-    { value: "25+", label: "Projects Shipped" },
+    { value: "25+", label: "Projects" },
+    { value: "3+ yrs", label: "Experience" },
     { value: "100%", label: "Responsive" },
   ],
   techTags: ["React", "Next.js", "TypeScript", "Node.js", "Tailwind", "Figma"],
   socials: [
-    { label: "GitHub", href: "https://github.com/", icon: "github" },
-    { label: "LinkedIn", href: "https://linkedin.com/", icon: "linkedin" },
-    { label: "Twitter", href: "https://x.com/", icon: "twitter" },
-    { label: "Instagram", href: "https://instagram.com/", icon: "instagram" },
+    { label: "GitHub", handle: "github.com/adarsh", href: "https://github.com/", icon: "github" },
+    { label: "LinkedIn", handle: "linkedin.com/in/adarsh", href: "https://linkedin.com/", icon: "linkedin" },
+    { label: "Twitter / X", handle: "x.com/adarsh", href: "https://x.com/", icon: "twitter" },
+    { label: "Instagram", handle: "@adarsh", href: "https://instagram.com/", icon: "instagram" },
   ],
 } as const;
 
@@ -74,29 +77,6 @@ export const about = {
     },
   ],
 };
-
-export const features = [
-  {
-    icon: "tree",
-    title: "Fully Responsive",
-    desc: "With carefully thought-out design, my work looks great on any device.",
-  },
-  {
-    icon: "star",
-    title: "Superb Design",
-    desc: "Modern, minimal interfaces with strong hierarchy and personality.",
-  },
-  {
-    icon: "chart",
-    title: "Fast & Optimised",
-    desc: "Lighthouse-friendly builds, lazy loading and lean bundles.",
-  },
-  {
-    icon: "bars",
-    title: "Modern Stack",
-    desc: "React, Next.js, TypeScript, Tailwind and Node on the backend.",
-  },
-];
 
 /** The large featured project, with an interactive tab explorer. */
 export const flagship = {
@@ -231,14 +211,3 @@ export const projects: {
   },
 ];
 
-/** Gallery & carousel tiles. Add `src: "/your-image.jpg"` (put files in /public) to show real images. */
-export const gallery: { title: string; src?: string; hue: number }[] = [
-  { title: "Landing Page", hue: 205 },
-  { title: "Dashboard", hue: 225 },
-  { title: "Mobile App", hue: 190 },
-  { title: "Brand Kit", hue: 260 },
-  { title: "Storefront", hue: 175 },
-  { title: "Blog", hue: 215 },
-  { title: "Icons", hue: 240 },
-  { title: "Posters", hue: 200 },
-];
