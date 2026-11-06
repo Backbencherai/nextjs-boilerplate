@@ -29,7 +29,7 @@ class Boundary extends Component<{ children: ReactNode; fallback: ReactNode }, {
   }
 }
 
-function Model({ character, anim = "idle", height = 1.6, onClick }: { character: CharId; anim?: Anim; height?: number; onClick?: () => void }) {
+function Model({ character, anim = "idle", height = 1.6, onClick, pace }: { character: CharId; anim?: Anim; height?: number; onClick?: () => void; pace?: number }) {
   const { scene, animations } = useGLTF(url(character), false);
   const holder = useRef<THREE.Group>(null);
   const model = useMemo(() => {
@@ -63,6 +63,10 @@ function Model({ character, anim = "idle", height = 1.6, onClick }: { character:
     prev?.fadeOut(0.25);
     cur.current = name;
   }, [anim, actions]);
+  useEffect(() => {
+    const a = cur.current ? actions[cur.current] : null;
+    if (a) a.timeScale = pace ?? 1;
+  }, [pace, anim, actions]);
   return (
     <group
       onClick={(e) => {
@@ -102,7 +106,7 @@ function Placeholder({ height = 1.6 }: { height?: number }) {
 }
 
 /** A player's chosen character, animated. Falls back to a simple figure while loading/offline. */
-export function Hero(props: { character: CharId; anim?: Anim; height?: number; onClick?: () => void }) {
+export function Hero(props: { character: CharId; anim?: Anim; height?: number; onClick?: () => void; pace?: number }) {
   const fb = <Placeholder height={props.height} />;
   return (
     <Boundary fallback={fb}>

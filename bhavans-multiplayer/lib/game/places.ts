@@ -131,8 +131,8 @@ export function searchPlaces(q: string, max = 8): Place[] {
 
 /** Transport inside a city. Speeds are game-scaled so big real cities stay fun to cross. */
 export const MODES = {
-  walk: { icon: "🚶", name: "Walk", speed: 4, perKm: 0 },
-  run: { icon: "🏃", name: "Run", speed: 8, perKm: 0 },
+  walk: { icon: "🚶", name: "Walk", speed: 2.2, perKm: 0 },
+  run: { icon: "🏃", name: "Run", speed: 6.5, perKm: 0 },
   cab: { icon: "🚕", name: "Cab", speed: 24, perKm: 3 },
   bus: { icon: "🚌", name: "Bus", speed: 15, perKm: 1 },
   metro: { icon: "🚇", name: "Metro", speed: 0, perKm: 1.5 },

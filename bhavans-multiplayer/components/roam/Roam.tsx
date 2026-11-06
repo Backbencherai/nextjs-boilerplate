@@ -19,6 +19,7 @@ import * as E from "@/lib/game/engine";
 import type { CharId } from "@/lib/game/rules";
 import { rng, calamitiesBetween, hits } from "@/lib/game/world";
 import { Animals } from "./Animals";
+import { Prop, useParts } from "./props";
 import { countries } from "@/lib/geo";
 import { geoCentroid } from "d3-geo";
 import codes from "@/lib/countryCodes.json";
@@ -42,7 +43,50 @@ import { Festive, LightShow, Ocean, Throwables, npcPos, score, throwBall } from 
 import { FESTIVALS, decoOf, festivalsNow, type Festival } from "@/lib/game/festivals";
 import { Weather, addWind, seasonAt, skyLook, snowy, SEASON_META, SKY_META, type Season, type Sky as WSky } from "./Weather";
 
-const input = { x: 0, y: 0, look: { dx: 0, dy: 0 }, keys: new Set<string>(), lift: false };
+const input = { x: 0, y: 0, look: { dx: 0, dy: 0 }, keys: new Set<string>(), lift: false, zoom: 1 };
+
+/* Camera gestures: drag (mouse or finger) to orbit, pinch or wheel to zoom. Works on iPhone, where movementX is 0. */
+const ptrs = new Map<number, { x: number; y: number }>();
+let pinch = 0;
+function gestureHandlers() {
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      (e.target as Element).setPointerCapture?.(e.pointerId);
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (ptrs.size === 2) {
+        const [a, b] = [...ptrs.values()];
+        pinch = Math.hypot(a.x - b.x, a.y - b.y);
+      }
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      const last = ptrs.get(e.pointerId);
+      if (!last) return;
+      const dx = e.clientX - last.x;
+      const dy = e.clientY - last.y;
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (ptrs.size === 2) {
+        const [a, b] = [...ptrs.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (pinch) input.zoom = Math.max(0.45, Math.min(3, input.zoom * (pinch / d)));
+        pinch = d;
+        return;
+      }
+      input.look.dx += dx;
+      input.look.dy += dy;
+    },
+    onPointerUp: (e: React.PointerEvent) => {
+      ptrs.delete(e.pointerId);
+      pinch = 0;
+    },
+    onPointerCancel: (e: React.PointerEvent) => {
+      ptrs.delete(e.pointerId);
+      pinch = 0;
+    },
+    onWheel: (e: React.WheelEvent) => {
+      input.zoom = Math.max(0.45, Math.min(3, input.zoom * (e.deltaY > 0 ? 1.1 : 0.9)));
+    },
+  };
+}
 type View = "third" | "first" | "drone";
 const RIDES = ["cab", "bus", "ski", "jetski", "boat"] as const;
 const isRide = (m: Mode): m is (typeof RIDES)[number] => (RIDES as readonly string[]).includes(m);
@@ -185,13 +229,7 @@ export function Roam() {
         dpr={[1, 1.6]}
         gl={{ antialias: true, powerPreference: "high-performance" }}
         camera={{ fov: 60, near: 0.2, far: 2400, position: [0, 6, 80] }}
-        onPointerDown={(e) => (e.target as Element).setPointerCapture?.(e.pointerId)}
-        onPointerMove={(e) => {
-          if (e.buttons || e.pointerType === "touch") {
-            input.look.dx += e.movementX;
-            input.look.dy += e.movementY;
-          }
-        }}
+        {...gestureHandlers()}
       >
         <World key={place.id} india={place.country === "India"} style={style} sky={sky} deco={deco} fight={fight} monument={monument} label={place.name} hour={hour} mode={mode} view={view} character={(nation?.character ?? "scholar") as CharId} tel={tel} />
       </Canvas>
@@ -427,6 +465,7 @@ function World({ india, style, sky, deco, fight, monument, label, hour, mode, vi
       {chunks.map((c) => (
         <ChunkMesh key={c.key} c={c} style={style} night={night} />
       ))}
+      <AdTicker />
       <Trees chunks={chunks} season={(style.season ?? "summer") as Season} snow={!!style.snow} />
       <Lamps chunks={chunks} night={night} />
       {monument && <Monument id={monument} label={label} />}
@@ -652,6 +691,107 @@ function buildChunk(c: Chunk, style: CityStyle) {
   return { g, sg };
 }
 
+/* ───── animated advert screens (Times Square style) ───── */
+const ADS = [
+  { bg: ["#ff3d7f", "#7b2ff7"], t: "BHAVAN'S BANK", s: "5% on savings · open an account today", i: "🏦" },
+  { bg: ["#00b4d8", "#0077b6"], t: "DRINK WATER", s: "8 glasses a day = a stronger currency 💧", i: "💧" },
+  { bg: ["#ff9e00", "#ff4800"], t: "FLY TO AGRA", s: "See the Taj Mahal · tickets from 30 coins", i: "✈️" },
+  { bg: ["#06d6a0", "#118ab2"], t: "STUDY 60 MIN", s: "+60 knowledge · beat Centerpoint School", i: "📚" },
+  { bg: ["#ffd60a", "#ff8500"], t: "DIWALI SALE", s: "Lights · sweets · fireworks · 50% off", i: "🪔" },
+  { bg: ["#e63946", "#1d3557"], t: "GYM OPEN 24/7", s: "Work out 30 min · build your army", i: "🏋️" },
+  { bg: ["#8338ec", "#3a0ca3"], t: "CITY METRO", s: "Ride anywhere in the country · 1.5 coins/km", i: "🚇" },
+  { bg: ["#2ec4b6", "#011627"], t: "BEACH HOLIDAYS", s: "Jet skis · boats · cruises · Goa & Maldives", i: "🏖️" },
+];
+const screens: { c: HTMLCanvasElement; t: THREE.CanvasTexture; ad: number }[] = [];
+function screen(k: number) {
+  while (screens.length <= k) {
+    const c = document.createElement("canvas");
+    c.width = 512;
+    c.height = 256;
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    screens.push({ c, t, ad: screens.length * 3 });
+  }
+  return screens[k].t;
+}
+function drawScreens(time: number) {
+  for (const [k, sc] of screens.entries()) {
+    const ad = ADS[(Math.floor(time / 6) + sc.ad) % ADS.length];
+    const u = (time % 6) / 6;
+    const g = sc.c.getContext("2d")!;
+    const gr = g.createLinearGradient(0, 0, 512, 256);
+    const sh = Math.sin(time * 1.3 + k) * 0.5 + 0.5;
+    gr.addColorStop(0, ad.bg[0]);
+    gr.addColorStop(0.5 + sh * 0.4, ad.bg[1]);
+    gr.addColorStop(1, ad.bg[0]);
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 512, 256);
+    // moving light sweep
+    g.fillStyle = "rgba(255,255,255,0.14)";
+    g.beginPath();
+    const sx = ((time * 220 + k * 140) % 900) - 200;
+    g.moveTo(sx, 0);
+    g.lineTo(sx + 90, 0);
+    g.lineTo(sx - 30, 256);
+    g.lineTo(sx - 120, 256);
+    g.fill();
+    const slide = Math.min(1, u * 5);
+    g.font = "120px sans-serif";
+    g.textAlign = "center";
+    g.fillText(ad.i, 90, 160 + Math.sin(time * 4) * 6);
+    g.fillStyle = "#ffffff";
+    g.textAlign = "left";
+    g.font = "bold 58px sans-serif";
+    g.fillText(ad.t, 170 - (1 - slide) * 300, 120);
+    g.font = "26px sans-serif";
+    g.globalAlpha = slide;
+    g.fillText(ad.s, 170, 170);
+    g.globalAlpha = 1;
+    g.fillStyle = "rgba(0,0,0,0.25)";
+    g.fillRect(0, 236, 512 * u, 20);
+    sc.t.needsUpdate = true;
+  }
+}
+function AdTicker() {
+  const last = useRef(0);
+  useFrame(({ clock }) => {
+    if (clock.elapsedTime - last.current < 0.1) return; // 10 fps is plenty for a billboard
+    last.current = clock.elapsedTime;
+    drawScreens(clock.elapsedTime);
+  });
+  return null;
+}
+function Billboards({ c }: { c: Chunk }) {
+  const boards = useMemo(() => {
+    const r = rng("ads:" + c.key);
+    return c.boxes
+      .filter((b) => !b.house && b.h > 24 && r() < 0.3)
+      .slice(0, 3)
+      .map((b, i) => {
+        const w = Math.min(b.w * 0.75, 18);
+        const h = w / 2;
+        const side = r() < 0.5 ? 1 : -1;
+        return { x: b.x, y: 6 + h / 2 + r() * Math.min(12, b.h - h - 8), z: b.z + side * (b.d / 2 + 0.25), w, h, rot: side > 0 ? 0 : Math.PI, k: (Math.abs(c.cx * 7 + c.cz * 3) + i) % 6 };
+      });
+  }, [c]);
+  return (
+    <>
+      {boards.map((b, i) => (
+        <group key={i} position={[b.x, b.y, b.z]} rotation={[0, b.rot, 0]}>
+          <mesh position={[0, 0, -0.12]}>
+            <boxGeometry args={[b.w + 0.8, b.h + 0.8, 0.25]} />
+            <meshStandardMaterial color="#1b1d22" metalness={0.5} roughness={0.4} />
+          </mesh>
+          <mesh>
+            <planeGeometry args={[b.w, b.h]} />
+            <meshBasicMaterial map={screen(b.k)} toneMapped={false} />
+          </mesh>
+        </group>
+      ))}
+    </>
+  );
+}
+
 function ChunkMesh({ c, style, night }: { c: Chunk; style: CityStyle; night: boolean }) {
   const { g, sg } = useMemo(() => buildChunk(c, style), [c, style]);
   const tex = facadeTex();
@@ -670,6 +810,7 @@ function ChunkMesh({ c, style, night }: { c: Chunk; style: CityStyle; night: boo
       <mesh geometry={sg} receiveShadow>
         <meshStandardMaterial vertexColors roughness={0.95} />
       </mesh>
+      {style.env === "city" && <Billboards c={c} />}
     </group>
   );
 }
@@ -840,87 +981,49 @@ function crownColor(col: THREE.Color, season: Season, snow: boolean, r: () => nu
 
 function Trees({ chunks, season, snow }: { chunks: Chunk[]; season: Season; snow: boolean }) {
   const trees = useMemo(() => chunks.flatMap((c) => c.trees), [chunks]);
-  const trunk = useRef<THREE.InstancedMesh>(null);
-  const round = useRef<THREE.InstancedMesh>(null);
-  const pine = useRef<THREE.InstancedMesh>(null);
-  const palm = useRef<THREE.InstancedMesh>(null);
-  const MAX = 4000;
+  // Blender-made broadleaf, fir and palm, each split into trunk + leaves
+  const kinds = { broad: useParts("TreeBroad"), pine: useParts("TreePine"), palm: useParts("Palm") };
+  const refs = useRef<Record<string, (THREE.InstancedMesh | null)[]>>({ broad: [], pine: [], palm: [] });
+  const MAX = 3000;
+  useMemo(() => {
+    for (const k of Object.values(kinds)) for (const p of k) if (p.leaves && !p.mat.userData.wind) {
+      addWind(p.mat);
+      p.mat.userData.wind = true;
+    }
+  }, [kinds.broad, kinds.pine, kinds.palm]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const col = new THREE.Color();
-    let a = 0;
-    let b = 0;
-    let c = 0;
-    let d = 0;
+    const n: Record<string, number> = { broad: 0, pine: 0, palm: 0 };
     for (const t of trees.slice(0, MAX)) {
+      const kind = t.kind === 1 ? "pine" : t.kind === 3 ? "palm" : "broad";
       const r = rng(`${t.x},${t.z}`);
       q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), r() * 6.28);
-      const tall = t.kind === 3 ? 7 : t.kind === 1 ? 2 : 2.6;
-      m.compose(new THREE.Vector3(t.x, (tall * t.s) / 2, t.z), q, new THREE.Vector3(t.s, t.s * tall, t.s));
-      trunk.current!.setMatrixAt(a++, m);
-      if (t.kind === 1) {
-        m.compose(new THREE.Vector3(t.x, 2 * t.s + 3.4 * t.s, t.z), q, new THREE.Vector3(t.s, t.s, t.s));
-        pine.current!.setMatrixAt(b, m);
-        pine.current!.setColorAt(b++, snow && r() < 0.5 ? col.setHSL(0.6, 0.12, 0.9) : col.setHSL(0.36 + r() * 0.04, 0.45, 0.28 + r() * 0.08));
-      } else if (t.kind === 3) {
-        m.compose(new THREE.Vector3(t.x, 7 * t.s, t.z), q, new THREE.Vector3(t.s * 1.3, t.s * 0.45, t.s * 1.3));
-        palm.current!.setMatrixAt(c, m);
-        palm.current!.setColorAt(c++, col.setHSL(0.3, 0.55, 0.4 + r() * 0.08));
-      } else {
-        m.compose(new THREE.Vector3(t.x, 2.6 * t.s + 2.2 * t.s, t.z), q, new THREE.Vector3(t.s, t.s * (0.9 + r() * 0.3), t.s));
-        round.current!.setMatrixAt(d, m);
-        round.current!.setColorAt(d++, crownColor(col, season, snow, r, t.kind === 2));
-      }
+      const sc = t.s * (kind === "pine" ? 1.15 : kind === "palm" ? 1 : 0.9 + r() * 0.25);
+      m.compose(new THREE.Vector3(t.x, 0.2, t.z), q, new THREE.Vector3(sc, sc * (0.9 + r() * 0.25), sc));
+      const i = n[kind]++;
+      const leaf = kind === "pine" ? (snow && r() < 0.5 ? col.setHSL(0.6, 0.12, 0.9) : col.setHSL(0.36 + r() * 0.04, 0.45, 0.28 + r() * 0.08)) : kind === "palm" ? col.setHSL(0.27, 0.55, 0.42 + r() * 0.08) : crownColor(col, season, snow, r, t.kind === 2);
+      refs.current[kind].forEach((im, k) => {
+        if (!im) return;
+        im.setMatrixAt(i, m);
+        if (kinds[kind as keyof typeof kinds][k]?.leaves) im.setColorAt(i, leaf);
+      });
     }
-    for (const [ref, n] of [
-      [trunk, a],
-      [pine, b],
-      [palm, c],
-      [round, d],
-    ] as [React.RefObject<THREE.InstancedMesh>, number][]) {
-      ref.current!.count = n;
-      ref.current!.instanceMatrix.needsUpdate = true;
-      if (ref.current!.instanceColor) ref.current!.instanceColor.needsUpdate = true;
-      ref.current!.computeBoundingSphere();
-    }
-  }, [trees, season, snow]);
-  const crowns = useMemo(() => {
-    // leafy clusters, layered firs and drooping palm fronds instead of single blobs
-    const blobs = [
-      [0, 0, 0, 2.1],
-      [1.3, -0.4, 0.4, 1.4],
-      [-1.2, -0.3, -0.5, 1.5],
-      [0.3, 1.1, -0.2, 1.3],
-      [-0.4, -0.2, 1.2, 1.3],
-      [0.5, -0.5, -1.3, 1.2],
-    ].map(([x, y, z, r]) => new THREE.IcosahedronGeometry(r, 1).translate(x, y, z));
-    const round = mergeGeometries(blobs)!;
-    const tiers = [0, 1, 2, 3].map((i) => new THREE.ConeGeometry(2.4 - i * 0.5, 2.8, 8).translate(0, -2.2 + i * 1.6, 0));
-    const pine = mergeGeometries(tiers)!;
-    const fronds = Array.from({ length: 8 }, (_, i) => {
-      const g = new THREE.BoxGeometry(0.7, 0.08, 3.4).translate(0, 0, 1.7);
-      g.rotateX(0.45);
-      g.rotateY((i / 8) * Math.PI * 2);
-      return g;
-    });
-    const palm = mergeGeometries(fronds)!;
-    return { round, pine, palm };
-  }, []);
-  const wind = useMemo(() => {
-    const ms = [0, 1, 2].map(() => new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true }));
-    ms.forEach((m) => addWind(m));
-    return ms;
-  }, []);
+    for (const kind of Object.keys(refs.current))
+      refs.current[kind].forEach((im) => {
+        if (!im) return;
+        im.count = n[kind];
+        im.instanceMatrix.needsUpdate = true;
+        if (im.instanceColor) im.instanceColor.needsUpdate = true;
+        im.computeBoundingSphere();
+      });
+  }, [trees, season, snow, kinds.broad, kinds.pine, kinds.palm]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
-      <instancedMesh ref={trunk} args={[undefined, undefined, MAX]} castShadow>
-        <cylinderGeometry args={[0.18, 0.28, 1, 6]} />
-        <meshStandardMaterial color="#8a5a3b" roughness={1} />
-      </instancedMesh>
-      <instancedMesh ref={round} args={[crowns.round, wind[0], MAX]} castShadow receiveShadow />
-      <instancedMesh ref={pine} args={[crowns.pine, wind[1], MAX]} castShadow />
-      <instancedMesh ref={palm} args={[crowns.palm, wind[2], MAX]} castShadow />
+      {(Object.keys(kinds) as (keyof typeof kinds)[]).map((kind) =>
+        kinds[kind].map((p, k) => <instancedMesh key={kind + p.name} ref={(el) => void (refs.current[kind][k] = el)} args={[p.geo, p.mat, MAX]} castShadow receiveShadow={p.leaves} />)
+      )}
     </>
   );
 }
@@ -987,10 +1090,8 @@ function Clouds() {
 const CAR_COLS = ["#e74c3c", "#3498db", "#f1c40f", "#2ecc71", "#ffffff", "#9b59b6", "#e67e22", "#34495e", "#1abc9c", "#f78fb3"];
 function Traffic({ style, tel, night }: { style: CityStyle; tel: React.RefObject<Tel>; night: boolean }) {
   const N = style.env === "forest" ? 6 : 38;
-  const body = useRef<THREE.InstancedMesh>(null);
-  const cabin = useRef<THREE.InstancedMesh>(null);
-  const wheel = useRef<THREE.InstancedMesh>(null);
-  const lights = useRef<THREE.InstancedMesh>(null);
+  const parts = useParts("Car");
+  const refs = useRef<(THREE.InstancedMesh | null)[]>([]);
   const cars = useMemo(() => Array.from({ length: N }, (_, i) => ({ axis: i % 2, line: 0, dir: 1, t: 0, speed: 9 + (i % 5) * 2.5, init: false, color: CAR_COLS[i % CAR_COLS.length] })), [N]);
   const m = useMemo(() => new THREE.Matrix4(), []);
   const q = useMemo(() => new THREE.Quaternion(), []);
@@ -999,9 +1100,13 @@ function Traffic({ style, tel, night }: { style: CityStyle; tel: React.RefObject
   const up = useMemo(() => new THREE.Vector3(0, 1, 0), []);
   useEffect(() => {
     const c = new THREE.Color();
-    cars.forEach((car, i) => body.current!.setColorAt(i, c.set(car.color)));
-    body.current!.instanceColor!.needsUpdate = true;
-  }, [cars]);
+    parts.forEach((p, k) => {
+      const im = refs.current[k];
+      if (!im || !p.paint) return;
+      cars.forEach((car, i) => im.setColorAt(i, c.set(car.color)));
+      if (im.instanceColor) im.instanceColor.needsUpdate = true;
+    });
+  }, [cars, parts]);
   const respawn = (car: (typeof cars)[number], px: number, pz: number, r: () => number) => {
     const base = car.axis ? pz : px;
     let k = Math.round(base / CELL) + Math.floor(r() * 9) - 4;
@@ -1034,42 +1139,20 @@ function Traffic({ style, tel, night }: { style: CityStyle; tel: React.RefObject
       x = car.axis ? car.t : car.line + lane;
       z = car.axis ? car.line - lane : car.t;
       q.setFromAxisAngle(up, car.axis ? (car.dir > 0 ? -Math.PI / 2 : Math.PI / 2) : car.dir > 0 ? Math.PI : 0);
-      m.compose(v.set(x, 0.75, z), q, one);
-      body.current!.setMatrixAt(i, m);
-      m.compose(v.set(x, 1.55, z), q, one);
-      cabin.current!.setMatrixAt(i, m);
-      lights.current!.setMatrixAt(i, m.compose(v.set(x, 0.85, z), q, one));
-      const fx = car.axis ? 0 : 1;
-      for (let w = 0; w < 4; w++) {
-        const ox = (w % 2 ? 0.9 : -0.9) * (car.axis ? 0 : 1) + (w < 2 ? 1.35 : -1.35) * (car.axis ? 1 : 0);
-        const oz = (w % 2 ? 0.9 : -0.9) * (car.axis ? 1 : 0) + (w < 2 ? 1.35 : -1.35) * fx;
-        m.compose(v.set(x + ox, 0.38, z + oz), q, one);
-        wheel.current!.setMatrixAt(i * 4 + w, m);
-      }
+      m.compose(v.set(x, 0, z), q, one);
+      for (const im of refs.current) im?.setMatrixAt(i, m);
     });
-    for (const rf of [body, cabin, wheel, lights]) {
-      rf.current!.instanceMatrix.needsUpdate = true;
-      rf.current!.computeBoundingSphere();
+    for (const im of refs.current) {
+      if (!im) continue;
+      im.instanceMatrix.needsUpdate = true;
+      im.computeBoundingSphere();
     }
   });
   return (
     <>
-      <instancedMesh ref={body} args={[undefined, undefined, N]} castShadow>
-        <boxGeometry args={[1.85, 0.8, 4.3]} />
-        <meshStandardMaterial roughness={0.35} metalness={0.15} />
-      </instancedMesh>
-      <instancedMesh ref={cabin} args={[undefined, undefined, N]} castShadow>
-        <boxGeometry args={[1.6, 0.75, 2.2]} />
-        <meshStandardMaterial color="#2b3a4f" roughness={0.1} metalness={0.5} />
-      </instancedMesh>
-      <instancedMesh ref={lights} args={[undefined, undefined, N]}>
-        <boxGeometry args={[1.5, 0.18, 4.36]} />
-        <meshStandardMaterial color="#fff6d0" emissive="#fff0b0" emissiveIntensity={night ? 1.6 : 0.2} />
-      </instancedMesh>
-      <instancedMesh ref={wheel} args={[undefined, undefined, N * 4]}>
-        <boxGeometry args={[0.32, 0.76, 0.76]} />
-        <meshStandardMaterial color="#1c1c22" roughness={0.9} />
-      </instancedMesh>
+      {parts.map((p, k) => (
+        <instancedMesh key={p.name} ref={(el) => void (refs.current[k] = el)} args={[p.geo, p.mat, N]} castShadow={p.paint} frustumCulled={false} />
+      ))}
     </>
   );
 }
@@ -1110,7 +1193,7 @@ function People({ tel, style }: { tel: React.RefObject<Tel>; style: CityStyle })
     <>
       {ps.map((p, i) => (
         <group key={i} ref={(el) => void (refs.current[i] = el)}>
-          <Hero character={p.who} anim="walk" height={p.h} />
+          <Hero character={p.who} anim="walk" height={p.h} pace={p.sp / 1.9} />
         </group>
       ))}
     </>
@@ -1124,6 +1207,7 @@ function Player({ mode, view, character, tel, boxes, monumentR, style, onChunk }
   const spawnZ = monumentR >= 36 ? monumentR + 110 : monumentR + 48;
   const s = useRef({ x: 0, z: spawnZ, y: 0, yaw: style.env === "beach" ? Math.PI : 0, pitch: -0.04, speed: 0, face: 0, roof: null as Box | null });
   const [anim, setAnim] = useState<Anim>("idle");
+  const [pace, setPace] = useState(1);
   const tmp = useMemo(() => new THREE.Vector3(), []);
   const lastChunk = useRef("0,0");
 
@@ -1131,6 +1215,8 @@ function Player({ mode, view, character, tel, boxes, monumentR, style, onChunk }
     const st = s.current;
     const dt = Math.min(0.05, dtRaw);
     const k = input.keys;
+    if (k.has("q")) st.yaw += dt * 1.8;
+    if (k.has("e")) st.yaw -= dt * 1.8;
     st.yaw -= input.look.dx * 0.0045;
     st.pitch = Math.max(-1.25, Math.min(0.75, st.pitch - input.look.dy * 0.0035));
     input.look.dx = input.look.dy = 0;
@@ -1217,11 +1303,13 @@ function Player({ mode, view, character, tel, boxes, monumentR, style, onChunk }
 
     if (body.current) {
       body.current.position.set(st.x, st.y, st.z);
-      body.current.rotation.y = st.face;
+      body.current.rotation.y = ride ? st.face : st.face + Math.PI; // the character model looks down +z
       body.current.visible = view !== "first";
     }
-    const a2: Anim = ride ? (mode === "jetski" ? "sit" : "idle") : st.speed < 0.3 ? "idle" : st.speed > 5 ? "run" : "walk";
+    const a2: Anim = ride ? (mode === "jetski" ? "sit" : "idle") : st.speed < 0.25 ? "idle" : st.speed > 3.6 ? "run" : "walk";
     if (a2 !== anim) setAnim(a2);
+    const p2 = a2 === "walk" ? Math.max(0.6, st.speed / 1.9) : a2 === "run" ? Math.max(0.8, st.speed / 5.5) : 1;
+    if (Math.abs(p2 - pace) > 0.12) setPace(Math.round(p2 * 10) / 10);
 
     // cameras
     if (view === "first") {
@@ -1229,7 +1317,7 @@ function Player({ mode, view, character, tel, boxes, monumentR, style, onChunk }
       camera.position.set(st.x, st.y + eye, st.z);
       camera.rotation.set(st.pitch, st.yaw, 0, "YXZ");
     } else {
-      const dist = view === "drone" ? 34 : ride ? (mode === "bus" ? 15 : 10) : 6.5;
+      const dist = (view === "drone" ? 34 : ride ? (mode === "bus" ? 15 : 10) : 5.2) * input.zoom;
       const pitch = view === "drone" ? Math.min(-0.45, st.pitch - 0.4) : st.pitch;
       const cx2 = st.x + Math.sin(st.yaw) * Math.cos(pitch) * dist;
       const cz2 = st.z + Math.cos(st.yaw) * Math.cos(pitch) * dist;
@@ -1256,16 +1344,29 @@ function Player({ mode, view, character, tel, boxes, monumentR, style, onChunk }
     <group ref={body}>
       <Suspense fallback={null}>
         {mode === "cab" ? (
-          <Car color="#f6c21c" taxi />
+          <Prop root="Car" paint="#f6c21c">
+            <mesh position={[0, 1.5, 0.2]}>
+              <boxGeometry args={[0.7, 0.22, 0.32]} />
+              <meshStandardMaterial color="#ffffff" emissive="#fff3b0" emissiveIntensity={0.8} />
+            </mesh>
+          </Prop>
         ) : mode === "bus" ? (
-          <BusModel />
+          <Prop root="Bus" paint="#d6352b" />
         ) : mode === "jetski" ? (
-          <JetSki character={character} />
+          <Prop root="JetSki" paint="#f2c31a">
+            <group position={[0, 0.62, 0.3]} scale={0.85} rotation={[0, Math.PI, 0]}>
+              <Hero character={character} anim="sit" height={1.7} />
+            </group>
+          </Prop>
         ) : mode === "boat" ? (
-          <BoatModel character={character} />
+          <Prop root="Boat">
+            <group position={[0, 0.95, 1.6]} rotation={[0, Math.PI, 0]}>
+              <Hero character={character} anim="idle" height={1.7} />
+            </group>
+          </Prop>
         ) : (
           <group>
-            <Hero character={character} anim={anim} height={1.7} />
+            <Hero character={character} anim={anim} height={1.7} pace={pace} />
             {mode === "ski" &&
               [-0.13, 0.13].map((x) => (
                 <mesh key={x} position={[x, 0.03, 0]}>
@@ -1350,7 +1451,7 @@ function JetSki({ character }: { character: CharId }) {
         <boxGeometry args={[0.55, 0.5, 0.36]} />
         <meshStandardMaterial color="#ff6a00" roughness={0.6} />
       </mesh>
-      <group position={[0, 0.45, 0.3]} scale={0.85}>
+      <group position={[0, 0.45, 0.3]} scale={0.85} rotation={[0, Math.PI, 0]}>
         <Hero character={character} anim="sit" height={1.7} />
       </group>
     </group>
@@ -1371,7 +1472,7 @@ function BoatModel({ character }: { character: CharId }) {
         <boxGeometry args={[1.5, 1, 1.3]} />
         <meshStandardMaterial color="#1f3a93" roughness={0.2} metalness={0.4} />
       </mesh>
-      <group position={[0, 0.55, 1.1]}>
+      <group position={[0, 0.55, 1.1]} rotation={[0, Math.PI, 0]}>
         <Hero character={character} anim="idle" height={1.7} />
       </group>
     </group>

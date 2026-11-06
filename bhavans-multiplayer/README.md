@@ -65,7 +65,9 @@ Local: `npm install && npm run dev` (http://localhost:3400, in-memory data).
 Tap **🧭 Roam** in the menu. You get an endless cartoon city with towers, streets, traffic, citizens, parks and street lamps, and a monument in the centre (Taj Mahal, Qutub Minar, Eiffel Tower, Gateway of India, Big Ben, Pyramids, Burj Khalifa, Statue of Liberty, Golden Temple, Colosseum).
 - Search any city, monument, beach or mountain. Each city has its own look: New York and Dubai skyscrapers, Paris boulevards, Agra and Jaipur low-rise. Beaches get an ocean; ski places get snow.
 - Walk, run, cab, bus, metro, ski, jet ski, boat and cruise. Fares, gear (ski kit, life jacket…) and stamps are checked by the server.
-- Camera: 3rd person, 1st person or drone (button or **V**). Joystick on phones, WASD and drag to look on computers.
+- Camera: 3rd person, 1st person or drone (button or **V**). Drag with a finger or mouse to orbit all the way around, pinch or scroll to zoom, Q/E to turn. Joystick on phones, WASD on computers.
+- Vehicles (car, bus, speedboat, jet ski) and trees (broadleaf, fir, palm) are modelled in Blender: `python blender/make_props.py -- public/models/props.glb`.
+- Animated advert screens on downtown towers.
 - Real local day and night: lit windows, street lamps and floodlit monuments.
 - Optional: with `GOOGLE_MAPS_KEY` (Map Tiles API) a 🌐 button opens **real photorealistic 3D** of the same place.
 

@@ -20,7 +20,50 @@ import { distanceKm } from "@/lib/game/world";
 import type { CharId } from "@/lib/game/rules";
 
 /* shared, mutable input (keyboard + touch) read every frame */
-const input = { x: 0, y: 0, look: { dx: 0, dy: 0 }, keys: new Set<string>() };
+const input = { x: 0, y: 0, look: { dx: 0, dy: 0 }, keys: new Set<string>(), zoom: 1 };
+
+/* Camera gestures: drag (mouse or finger) to orbit, pinch or wheel to zoom. Works on iPhone, where movementX is 0. */
+const ptrs = new Map<number, { x: number; y: number }>();
+let pinch = 0;
+function gestureHandlers() {
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      (e.target as Element).setPointerCapture?.(e.pointerId);
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (ptrs.size === 2) {
+        const [a, b] = [...ptrs.values()];
+        pinch = Math.hypot(a.x - b.x, a.y - b.y);
+      }
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      const last = ptrs.get(e.pointerId);
+      if (!last) return;
+      const dx = e.clientX - last.x;
+      const dy = e.clientY - last.y;
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (ptrs.size === 2) {
+        const [a, b] = [...ptrs.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (pinch) input.zoom = Math.max(0.45, Math.min(3, input.zoom * (pinch / d)));
+        pinch = d;
+        return;
+      }
+      input.look.dx += dx;
+      input.look.dy += dy;
+    },
+    onPointerUp: (e: React.PointerEvent) => {
+      ptrs.delete(e.pointerId);
+      pinch = 0;
+    },
+    onPointerCancel: (e: React.PointerEvent) => {
+      ptrs.delete(e.pointerId);
+      pinch = 0;
+    },
+    onWheel: (e: React.WheelEvent) => {
+      input.zoom = Math.max(0.45, Math.min(3, input.zoom * (e.deltaY > 0 ? 1.1 : 0.9)));
+    },
+  };
+}
 type Telemetry = { lat: number; lon: number; speed: number; heading: number; ready: boolean; km: number };
 
 const R2D = 180 / Math.PI;
@@ -149,13 +192,7 @@ export function Explore() {
         dpr={[1, 1.5]}
         gl={{ antialias: true, logarithmicDepthBuffer: true, powerPreference: "high-performance" }}
         camera={{ fov: 62, near: 0.3, far: 160000, position: [0, 300, 300] }}
-        onPointerDown={(e) => (e.target as Element).setPointerCapture?.(e.pointerId)}
-        onPointerMove={(e) => {
-          if (e.buttons || e.pointerType === "touch") {
-            input.look.dx += e.movementX;
-            input.look.dy += e.movementY;
-          }
-        }}
+        {...gestureHandlers()}
       >
         <World key={place.id + key} place={place} mapsKey={key} testSet={testSet} mode={mode} view={view} character={(nation?.character ?? "scholar") as CharId} tel={tel} onAttr={setAttr} hour={hour} />
       </Canvas>
@@ -445,6 +482,8 @@ function Player({ tiles, mode, view, character, tel, place, spawn }: { spawn: nu
     s.frame++;
     const k = input.keys;
     // look
+    if (k.has("q")) s.yaw += dt * 1.8;
+    if (k.has("e")) s.yaw -= dt * 1.8;
     s.yaw -= input.look.dx * 0.0042;
     s.pitch = Math.max(-1.2, Math.min(0.9, s.pitch - input.look.dy * 0.0032));
     input.look.dx = input.look.dy = 0;
@@ -488,7 +527,7 @@ function Player({ tiles, mode, view, character, tel, place, spawn }: { spawn: nu
         mx = -Math.sin(a) * s.speed * dt;
         mz = -Math.cos(a) * s.speed * dt;
         if (body.current) {
-          const want = a;
+          const want = a + Math.PI; // the character model looks down +z
           const cur = body.current.rotation.y;
           const d = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
           body.current.rotation.y = cur + d * Math.min(1, dt * 10);
@@ -531,7 +570,7 @@ function Player({ tiles, mode, view, character, tel, place, spawn }: { spawn: nu
       camera.position.set(s.pos.x, s.pos.y + eye, s.pos.z);
       camera.rotation.set(s.pitch, s.yaw, 0, "YXZ");
     } else {
-      const dist = vehicle ? (mode === "bus" ? 16 : 10) : 7.5; // far enough that the world towers over you
+      const dist = (vehicle ? (mode === "bus" ? 16 : 10) : 7.5) * input.zoom; // far enough that the world towers over you
       const h = vehicle ? 3.6 : 2.6;
       const cx = s.pos.x + Math.sin(s.yaw) * Math.cos(s.pitch) * dist;
       const cz = s.pos.z + Math.cos(s.yaw) * Math.cos(s.pitch) * dist;

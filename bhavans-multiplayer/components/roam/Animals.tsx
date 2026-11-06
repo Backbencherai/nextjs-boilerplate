@@ -200,7 +200,7 @@ function Walkers({ me, kind, n, colors, speed }: { me: Me; kind: "dog" | "cow" |
       const x = p.axis ? p.t : p.line + p.off;
       const z = p.axis ? p.line + p.off : p.t;
       a.position.set(x, 0.22, z);
-      a.rotation.y = p.axis ? (p.dir > 0 ? -Math.PI / 2 : Math.PI / 2) : p.dir > 0 ? Math.PI : 0;
+      a.rotation.y = p.axis ? (p.dir > 0 ? -Math.PI / 2 : Math.PI / 2) : p.dir > 0 ? Math.PI : 0; // head is at -z
     });
   });
   return (
